@@ -48,6 +48,9 @@ public class CertificateActor extends BaseActor {
       case "issueCertificate":
         issueCertificate(request);
         break;
+      case "issueEventCertificate":
+        issueEventCertificate(request);
+        break;
       default:
         onReceiveUnsupportedOperation(request.getOperation());
         break;
@@ -148,4 +151,82 @@ public class CertificateActor extends BaseActor {
     String topic = ProjectUtil.getConfigValue("kafka_topics_certificate_instruction");
     InstructionEventGenerator.pushInstructionEvent(batchId, topic, data);
   }
+
+  private void issueEventCertificate(Request request) {
+    logger.info(request.getRequestContext(), "issueEventCertificate request=" + request.getRequest());
+    final String batchId = (String) request.getRequest().get(JsonKey.BATCH_ID);
+    final String eventId = (String) request.getRequest().get(JsonKey.EVENT_ID);
+    List<String> userIds = (List<String>) request.getRequest().get(JsonKey.USER_IDs);
+    final boolean reIssue = isReissue(request.getContext().get(CourseJsonKey.REISSUE));
+    Map<String, Object> courseBatchResponse =
+            CourseBatchUtil.validateEventBatch(request.getRequestContext(), eventId, batchId);
+    if (null == courseBatchResponse.get("cert_templates")) {
+      ProjectCommonException.throwClientErrorException(
+              ResponseCode.CLIENT_ERROR, "No certificate templates associated with " + batchId);
+    }
+    Response response = new Response();
+    Map<String, Object> resultData = new HashMap<>();
+    resultData.put(
+            JsonKey.STATUS, MessageFormat.format(ResponseMessage.SUBMITTED.getValue(), batchId));
+    resultData.put(JsonKey.BATCH_ID, batchId);
+    resultData.put(JsonKey.EVENT_ID, eventId);
+    resultData.put(JsonKey.COLLECTION_ID, eventId);
+    response.put(JsonKey.RESULT, resultData);
+    try {
+      pushInstructionEventForEvent(batchId, eventId, userIds, reIssue);
+    } catch (Exception e) {
+      logger.error(request.getRequestContext(), "issueCertificate pushInstructionEvent error for eventId="
+              + eventId + ", batchId=" + batchId, e);
+      resultData.put(
+              JsonKey.STATUS, MessageFormat.format(ResponseMessage.FAILED.getValue(), batchId));
+    }
+    sender().tell(response, self());
+  }
+
+  private void pushInstructionEventForEvent(
+          String batchId, String eventId, List<String> userIds, boolean reIssue) throws Exception {
+    Map<String, Object> data = new HashMap<>();
+
+    data.put(
+            CourseJsonKey.ACTOR,
+            new HashMap<String, Object>() {
+              {
+                put(JsonKey.ID, InstructionEvent.ISSUE_COURSE_CERTIFICATE.getActorId());
+                put(JsonKey.TYPE, InstructionEvent.ISSUE_COURSE_CERTIFICATE.getActorType());
+              }
+            });
+
+    String id = OneWayHashing.encryptVal(batchId + CourseJsonKey.UNDERSCORE + eventId);
+    data.put(
+            CourseJsonKey.OBJECT,
+            new HashMap<String, Object>() {
+              {
+                put(JsonKey.ID, id);
+                put(JsonKey.TYPE, InstructionEvent.ISSUE_COURSE_CERTIFICATE.getType());
+              }
+            });
+
+    data.put(CourseJsonKey.ACTION, InstructionEvent.ISSUE_COURSE_CERTIFICATE.getAction());
+
+    data.put(
+            CourseJsonKey.E_DATA,
+            new HashMap<String, Object>() {
+              {
+                if (CollectionUtils.isNotEmpty(userIds)) {
+                  put(JsonKey.USER_IDs, userIds);
+                }
+                put(JsonKey.BATCH_ID, batchId);
+                put(JsonKey.EVENT_ID, eventId);
+                put(JsonKey.EVENT_COMPLETION_PERCENTAGE, 100.0);
+                put(CourseJsonKey.ACTION, InstructionEvent.ISSUE_COURSE_CERTIFICATE.getAction());
+                put(CourseJsonKey.ITERATION, 1);
+                if (reIssue) {
+                  put(CourseJsonKey.REISSUE, true);
+                }
+              }
+            });
+    String topic = ProjectUtil.getConfigValue("kafka_topics_event_certificate_instruction");
+    InstructionEventGenerator.pushInstructionEvent(batchId, topic, data);
+  }
+
 }
