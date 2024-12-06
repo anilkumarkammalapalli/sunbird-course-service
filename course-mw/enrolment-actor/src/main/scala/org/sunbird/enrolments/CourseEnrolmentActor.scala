@@ -40,6 +40,7 @@ import scala.collection.JavaConverters._
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 
 import scala.util.Try
+import org.sunbird.common.Constants
 
 class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") courseBatchNotificationActorRef: ActorRef
                                     )(implicit val  cacheUtil: RedisCacheUtil ) extends BaseEnrolmentActor {
@@ -169,8 +170,12 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
         validateEnrolment(batchData, enrolmentData, true, true)
         val dataBatch: util.Map[String, AnyRef] = createBatchUserMapping(batchId, userId,batchUserData)
         val data: java.util.Map[String, AnyRef] = createUserEnrolmentMap(userId, courseId, batchId, enrolmentData, request.getContext.getOrDefault(JsonKey.REQUEST_ID, "").asInstanceOf[String], request.getRequestContext)
-        dataBatch.put(JsonKey.COURSE_ENROLL_DATE, request.get(JsonKey.ENROLLED_DATE))
-        data.put(JsonKey.COURSE_ENROLL_DATE, request.get(JsonKey.ENROLLED_DATE))
+        val dateTimeFormat = ProjectUtil.getDateFormatter()
+        dateTimeFormat.setTimeZone(TimeZone.getTimeZone(ProjectUtil.getConfigValue(JsonKey.SUNBIRD_TIMEZONE)))
+        val enrolledDate = new SimpleDateFormat(Constants.SIMPLE_DATE_FORMAT).parse(request.get(JsonKey.ENROLLED_DATE).asInstanceOf[String])
+        val enrolledTimestamp = new java.sql.Timestamp(dateTimeFormat.parse(dateTimeFormat.format(enrolledDate)).getTime())
+        dataBatch.put(JsonKey.COURSE_ENROLL_DATE, enrolledTimestamp)
+        data.put(JsonKey.COURSE_ENROLL_DATE, enrolledTimestamp)
         val hasAccess = ContentUtil.getContentRead(courseId, request.getContext.getOrDefault(JsonKey.HEADER, new util.HashMap[String, String]).asInstanceOf[util.Map[String, String]])
         if (hasAccess) {
             upsertEnrollment(userId, courseId, batchId, data, dataBatch, (null == enrolmentData), request.getRequestContext)
