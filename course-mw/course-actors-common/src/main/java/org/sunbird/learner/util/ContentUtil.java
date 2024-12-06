@@ -11,7 +11,6 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpHeaders;
-import org.sunbird.common.Constants;
 import org.sunbird.common.ElasticSearchHelper;
 import org.sunbird.common.exception.ProjectCommonException;
 import org.sunbird.common.factory.EsClientFactory;
@@ -264,6 +263,22 @@ public final class ContentUtil {
     }
     return flag;
   }
+  public static Map<String, Object> getAllBatches(List identifierList,int pageSize) {
+    //int recordStart = 0;
+    int remainingRecords;
+    Map<String, Object> allRecords = new HashMap<>();
+    do {
+      Map.Entry<Integer, Map<String, Map<String, Object>>> contentsResult = batches(identifierList,allRecords.size(), pageSize);
+      int count = contentsResult.getKey();
+      Map<String, Map<String, Object>> batchMap = contentsResult.getValue();
+      allRecords.putAll(batchMap);
+      // Update remaining records and move to the next page if needed
+      remainingRecords = count - allRecords.size();
+      // recordStart = allRecords.size() - 1;
+    } while (remainingRecords > 0);
+
+    return allRecords;
+  }
   public static Map<String, Object> getAllContent(List identifierList,int pageSize) {
     //int recordStart = 0;
     int remainingRecords;
@@ -280,9 +295,40 @@ public final class ContentUtil {
 
     return allRecords;
   }
+  public static Map<String, Object> getAllBatches(int pageSize) {
+    return getAllBatches(null, pageSize);
+  }
   public static Map<String, Object> getAllContent(int pageSize) {
     return getAllContent(null, pageSize);
   }
+
+  public static Map.Entry<Integer, Map<String, Map<String, Object>>> batches(List identifierList,int offset, int limit) {
+    SearchDTO searchDTO = new SearchDTO();
+    searchDTO.setOffset(offset);
+    searchDTO.setLimit(limit);
+    HashMap sort = new HashMap();
+    sort.put("createdDate","asc");
+    searchDTO.setSortBy(sort);
+    HashMap filters = new java.util.HashMap<String, Object>();
+    if(identifierList != null && identifierList.size() > 0)
+      filters.put(JsonKey.BATCH_ID,identifierList);
+    searchDTO.getAdditionalProperties().put(JsonKey.FILTERS, filters);
+    Future<Map<String, Object>> resultFuture = EsClientFactory.getInstance(JsonKey.REST).search(null,searchDTO, ProjectUtil.EsType.courseBatch.getTypeName(),isCotentElasticSearchTypeDoc());
+    HashMap result= (HashMap<String,Object>) ElasticSearchHelper.getResponseFromFuture(resultFuture);
+    Long longCount = (Long) result.getOrDefault(JsonKey.COUNT, 0L);
+    int count = longCount.intValue();
+    List<Map<String, Object>> batchesList =  (List<Map<String, Object>>) result.getOrDefault(JsonKey.CONTENT, new ArrayList<>());
+    Map<String, Map<String, Object>> batchesMap = new HashMap<>();
+     if (CollectionUtils.isNotEmpty(batchesList)) {
+      for (Map<String, Object> batch : batchesList) {
+        String batchId = (String) batch.get(JsonKey.IDENTIFIER);
+        if(null != batchId && !batchId.isEmpty())
+        batchesMap.put(batchId, batch);
+     }
+    }
+    return new AbstractMap.SimpleEntry<>(count, batchesMap);
+  }
+
     public static Map.Entry<Integer, Map<String, Map<String, Object>>> contents(List identifierList,int offset, int limit) {
     SearchDTO searchDTO = new SearchDTO();
     searchDTO.setOffset(offset);

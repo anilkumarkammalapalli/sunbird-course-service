@@ -24,6 +24,8 @@ public class SchedulerManager {
     service.scheduleWithFixedDelay(new DataCacheHandler(), 0, PAGE_DATA_TTL, TimeUnit.HOURS);
     service.scheduleWithFixedDelay(new PageCacheLoaderService(), 0, PAGE_DATA_TTL, TimeUnit.HOURS);
     service.scheduleWithFixedDelay(new ContentCacheHandler(), 0, 15, TimeUnit.MINUTES);
+    service.scheduleWithFixedDelay(new BatchCacheHandler(), 0, 15, TimeUnit.MINUTES);
+
     logger.info(null, 
         "SchedulerManager:schedule: Started scheduler job for cache refresh.");
   }

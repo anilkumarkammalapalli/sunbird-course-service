@@ -1177,5 +1177,8 @@ public final class JsonKey {
   public static final String MEETING_LINK_URL = "meeting_link_url";
   public static final String MEETING_LINK = "meetingLink";
   public static final String KARMAYOGI_SAPTAH_END_DATE = "karmayogi_saptah_end_date";
+  public static final String ENROLLMENT_LIST_CACHE_BATCH_FETCH_ENABLED ="use_cache_for_enrollment_list_batch_fetch";
+  public static final String TRUE="true";
+  public static final String EVENT_COMPLETION_PERCENTAGE="eventCompletionPercentage";
   private JsonKey() {}
 }

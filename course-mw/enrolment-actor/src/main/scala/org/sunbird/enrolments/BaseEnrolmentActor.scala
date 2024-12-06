@@ -11,6 +11,7 @@ import org.sunbird.common.models.util.{JsonKey, ProjectUtil}
 import org.sunbird.common.request.RequestContext
 import org.sunbird.dto.SearchDTO
 import org.sunbird.helper.ServiceFactory
+import org.sunbird.learner.util.BatchCacheHandler
 
 abstract class BaseEnrolmentActor extends BaseActor {
 
@@ -27,6 +28,8 @@ abstract class BaseEnrolmentActor extends BaseActor {
         val response = ElasticSearchHelper.getResponseFromFuture(future).asInstanceOf[java.util.Map[String, AnyRef]]
         response.getOrDefault(JsonKey.CONTENT, new java.util.ArrayList[util.Map[String, AnyRef]]).asInstanceOf[util.List[util.Map[String, AnyRef]]]
     }
+
+
 
     def getBatchesV2(requestContext: RequestContext, batchId: String, courseId: String, requestedFields: java.util.List[String]): java.util.List[java.util.Map[String, AnyRef]] = {
         val filters = new java.util.HashMap[String, AnyRef]() {
