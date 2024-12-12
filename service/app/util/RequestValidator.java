@@ -1105,7 +1105,7 @@ public final class RequestValidator {
       Map<String, Object> courseContent = getCourseContent(contentId);
       String courseCategory = (String) courseContent.get("courseCategory");
       Boolean cumulativeTracking = (Boolean) courseContent.get("cumulativeTracking");
-      if (isProgramCategory(courseCategory) && cumulativeTracking != null && !cumulativeTracking) {
+      if (isProgramCategory(courseCategory) && cumulativeTracking != null && cumulativeTracking) {
         isProgram = true;
       }
     } catch (Exception e) {
