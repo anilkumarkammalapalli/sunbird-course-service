@@ -243,25 +243,34 @@ public final class ContentUtil {
     return JsonKey.SUCCESS.equalsIgnoreCase(response);
   }
 
-  public static boolean getContentRead(String courseId, Map<String, String> allHeaders) {
+  public static Map<String, Object> getContentRead(String courseId, Map<String, String> allHeaders) {
+    Map<String, Object> result = new HashMap<>();
     boolean flag = false;
     try {
       Map<String, String> headers = new HashMap<String, String>();
       if (allHeaders.containsKey(JsonKey.X_AUTH_USER_ORG_ID)) {
-        headers.put(JsonKey.X_AUTH_USER_ORG_ID, allHeaders.get(JsonKey.X_AUTH_USER_ORG_ID));
+       headers.put(JsonKey.X_AUTH_USER_ORG_ID, allHeaders.get(JsonKey.X_AUTH_USER_ORG_ID));
       }
-      String baseContentreadUrl = ProjectUtil.getConfigValue(JsonKey.EKSTEP_BASE_URL) + "/content/v3/read/" + courseId;
+      String baseContentreadUrl = ProjectUtil.getConfigValue(JsonKey.EKSTEP_BASE_URL) + "/content/v3/read/" + courseId+"?fields=courseCategory";
       String response = HttpUtil.sendGetRequest(baseContentreadUrl, headers);
       if (response != null && !response.isEmpty()) {
         Map<String, Object> data = mapper.readValue(response, Map.class);
         if (JsonKey.OK.equalsIgnoreCase((String) data.get(JsonKey.RESPONSE_CODE))) {
           flag = true;
+          result.put(JsonKey.FLAG, flag);
+          Map<String, Object> resultMap = (Map<String, Object>) data.get(JsonKey.RESULT);
+          Map<String, Object> content = (Map<String, Object>) resultMap.get(JsonKey.CONTENT);
+
+          String courseCategory = (String) content.get(JsonKey.COURSECATEGORY);
+          result.put(JsonKey.COURSECATEGORY, courseCategory);
+        } else {
+          result.put(JsonKey.FLAG, flag);
         }
       }
     } catch (Exception e) {
       logger.error(null, "User don't have access to this courseId " + courseId, e);
     }
-    return flag;
+    return result;
   }
   public static Map<String, Object> getAllBatches(List identifierList,int pageSize) {
     //int recordStart = 0;
