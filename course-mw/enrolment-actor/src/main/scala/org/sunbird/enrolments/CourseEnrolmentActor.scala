@@ -109,14 +109,19 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
         validateEnrolment(batchData, enrolmentData, true)
         val dataBatch: util.Map[String, AnyRef] = createBatchUserMapping(batchId, userId,batchUserData)
         val data: java.util.Map[String, AnyRef] = createUserEnrolmentMap(userId, courseId, batchId, enrolmentData, request.getContext.getOrDefault(JsonKey.REQUEST_ID, "").asInstanceOf[String], request.getRequestContext)
-        val hasAccess = ContentUtil.getContentRead(courseId, request.getContext.getOrDefault(JsonKey.HEADER, new util.HashMap[String, String]).asInstanceOf[util.Map[String, String]])
+        val responseMap = ContentUtil.getContentRead(courseId, request.getContext.getOrDefault(JsonKey.HEADER, new util.HashMap[String, String]).asInstanceOf[util.Map[String, String]])
+        val hasAccess = responseMap.get(JsonKey.FLAG).asInstanceOf[Boolean]
+        val courseCategory = responseMap.get(JsonKey.COURSECATEGORY).asInstanceOf[String]
         if (hasAccess) {
             upsertEnrollment(userId, courseId, batchId, data, dataBatch, (null == enrolmentData), request.getRequestContext)
             logger.info(request.getRequestContext, "CourseEnrolmentActor :: enroll :: Deleting redis for key " + getCacheKey(userId))
             cacheUtil.delete(getCacheKey(userId))
             sender().tell(successResponse(), self)
             generateTelemetryAudit(userId, courseId, batchId, data, "enrol", JsonKey.CREATE, request.getContext)
-            notifyUser(userId, batchData, JsonKey.ADD)
+            if (courseCategory != null && !courseCategory.trim().equalsIgnoreCase("case study")) {
+                logger.info(request.getRequestContext, "Notifying the user. Course Category:" + courseCategory)
+                notifyUser(userId, batchData, JsonKey.ADD);
+            }
             val dataMap = new java.util.HashMap[String, AnyRef]
             val requestMap = new java.util.HashMap[String, AnyRef]
             requestMap.put(JsonKey.COURSE_ID,courseId)
@@ -142,7 +147,8 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
         getUpdatedStatus(enrolmentData)
         validateEnrolment(batchData, enrolmentData, false)
         val data: java.util.Map[String, AnyRef] = new java.util.HashMap[String, AnyRef]() {{ put(JsonKey.ACTIVE, ProjectUtil.ActiveStatus.INACTIVE.getValue.asInstanceOf[AnyRef]) }}
-        val hasAccess = ContentUtil.getContentRead(courseId, request.getContext.getOrDefault(JsonKey.HEADER, new util.HashMap[String, String]).asInstanceOf[util.Map[String, String]])
+        val responseMap = ContentUtil.getContentRead(courseId, request.getContext.getOrDefault(JsonKey.HEADER, new util.HashMap[String, String]).asInstanceOf[util.Map[String, String]])
+        val hasAccess = responseMap.get(JsonKey.FLAG).asInstanceOf[Boolean]
         if (hasAccess) {
             upsertEnrollment(userId,courseId, batchId, data, dataBatch, false, request.getRequestContext)
             logger.info(request.getRequestContext, "CourseEnrolmentActor :: unEnroll :: Deleting redis for key " + getCacheKey(userId))
@@ -176,7 +182,8 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
         val enrolledTimestamp = new java.sql.Timestamp(dateTimeFormat.parse(dateTimeFormat.format(enrolledDate)).getTime())
         dataBatch.put(JsonKey.COURSE_ENROLL_DATE, enrolledTimestamp)
         data.put(JsonKey.COURSE_ENROLL_DATE, enrolledTimestamp)
-        val hasAccess = ContentUtil.getContentRead(courseId, request.getContext.getOrDefault(JsonKey.HEADER, new util.HashMap[String, String]).asInstanceOf[util.Map[String, String]])
+        val responseMap = ContentUtil.getContentRead(courseId, request.getContext.getOrDefault(JsonKey.HEADER, new util.HashMap[String, String]).asInstanceOf[util.Map[String, String]])
+        val hasAccess = responseMap.get(JsonKey.FLAG).asInstanceOf[Boolean]
         if (hasAccess) {
             upsertEnrollment(userId, courseId, batchId, data, dataBatch, (null == enrolmentData), request.getRequestContext)
             logger.info(request.getRequestContext, "CourseEnrolmentActor :: enroll :: Deleting redis for key " + getCacheKey(userId))
