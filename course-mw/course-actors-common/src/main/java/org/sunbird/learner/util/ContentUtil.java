@@ -260,9 +260,7 @@ public final class ContentUtil {
           result.put(JsonKey.FLAG, flag);
           Map<String, Object> resultMap = (Map<String, Object>) data.get(JsonKey.RESULT);
           Map<String, Object> content = (Map<String, Object>) resultMap.get(JsonKey.CONTENT);
-
-          String courseCategory = (String) content.get(JsonKey.COURSECATEGORY);
-          result.put(JsonKey.COURSECATEGORY, courseCategory);
+          result.put(JsonKey.COURSECATEGORY, (String) content.get(JsonKey.COURSECATEGORY));
         } else {
           result.put(JsonKey.FLAG, flag);
         }

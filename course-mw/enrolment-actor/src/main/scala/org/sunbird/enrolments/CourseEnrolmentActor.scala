@@ -118,7 +118,7 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
             cacheUtil.delete(getCacheKey(userId))
             sender().tell(successResponse(), self)
             generateTelemetryAudit(userId, courseId, batchId, data, "enrol", JsonKey.CREATE, request.getContext)
-            if (courseCategory != null && !courseCategory.trim().equalsIgnoreCase("case study")) {
+            if (courseCategory != null && !JsonKey.CASE_STUDY.equalsIgnoreCase(courseCategory.trim())) {
                 logger.info(request.getRequestContext, "Notifying the user. Course Category:" + courseCategory)
                 notifyUser(userId, batchData, JsonKey.ADD);
             }
