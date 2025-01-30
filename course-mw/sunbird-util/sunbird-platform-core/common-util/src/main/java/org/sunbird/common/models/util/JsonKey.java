@@ -1184,11 +1184,9 @@ public final class JsonKey {
   public static final String PROGRAM_CATEGORIES = "program_categories";
   public static final String FLAG = "flag";
   public static final String COURSECATEGORY = "courseCategory";
-  private JsonKey() {}
   public static final String REISSUE_DATE = "reIssueDate";
   public static final String INVALID_DATE_TIME = "Invalid date/time format. Expected format: yyyy-MM-dd HH:mm:ss";
   public static final String PROGRAM_CHILDREN_COURSES_ALLOWED_PRIMARY_CATEGORY = "program_children_courses_allowed_primary_category";
-  public static final String COURSECATEGORY = "courseCategory";
   public static final String EXTERNAL_COURSES_ENROLMENT_DB = "externalCoursesEnrolment_db";
   public static final String USER_COURSE_EXTERNAL_ENROLMENT_INFO = "userExternalCourseEnrolmentInfo";
   public static final String CB_PORES_SERVICE_BASE_URL = "cb_pores_service_base_url";
