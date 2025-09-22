@@ -78,10 +78,10 @@ public class BatchCacheHandlerV2 {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> fetchedContent = (Map<String, Object>) responseList.get(0);
                     if (fetchedContent != null && !fetchedContent.isEmpty()) {
-                        if (fetchedContent.containsKey("startDate") && fetchedContent.get("startDate") instanceof Date) {
-                            Date startDate = (Date) fetchedContent.get("startDate");
+                        if (fetchedContent.containsKey(JsonKey.START_DATE) && fetchedContent.get(JsonKey.START_DATE) instanceof Date) {
+                            Date startDate = (Date) fetchedContent.get(JsonKey.START_DATE);
                             String formattedStartDate = new SimpleDateFormat("yyyy-MM-dd").format(startDate);
-                            fetchedContent.put("startDate", formattedStartDate);
+                            fetchedContent.put(JsonKey.START_DATE, formattedStartDate);
                         }
                         batchCache.put(batchId, fetchedContent);
                         return fetchedContent;
