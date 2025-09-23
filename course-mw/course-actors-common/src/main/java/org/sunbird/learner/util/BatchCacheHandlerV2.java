@@ -83,6 +83,11 @@ public class BatchCacheHandlerV2 {
                             String formattedStartDate = new SimpleDateFormat("yyyy-MM-dd").format(startDate);
                             fetchedContent.put(JsonKey.START_DATE, formattedStartDate);
                         }
+                        if (fetchedContent.containsKey(JsonKey.UPDATED_DATE) && fetchedContent.get(JsonKey.UPDATED_DATE) instanceof Date) {
+                            Date updatedDate = (Date) fetchedContent.get(JsonKey.UPDATED_DATE);
+                            String formattedUpdatedDate = new SimpleDateFormat("yyyy-MM-dd").format(updatedDate);
+                            fetchedContent.put(JsonKey.UPDATED_DATE, formattedUpdatedDate);
+                        }
                         batchCache.put(batchId, fetchedContent);
                         return fetchedContent;
                     } else {
