@@ -1273,6 +1273,7 @@ public final class JsonKey {
   public static final String RECORDS = "records";
   public static final String CONTENT_READ = "content_read";
   public static final String DATE_KEY = "Date";
+  public static final String BATCH_ATTRIBUTES = "batchAttributes";
 
   private JsonKey() {}
 }

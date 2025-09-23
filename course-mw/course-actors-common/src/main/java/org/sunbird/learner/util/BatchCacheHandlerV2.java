@@ -26,6 +26,7 @@ public class BatchCacheHandlerV2 {
     private LoggerUtil logger = new LoggerUtil(BatchCacheHandlerV2.class);
     private CassandraOperation cassandraOperation = ServiceFactory.getInstance();
     private Cache<String, Map<String, Object>> batchCache;
+    private ObjectMapper mapper = new ObjectMapper();
 
     private BatchCacheHandlerV2() {
         long ttlMinutes = Long.parseLong(PropertiesCache.getInstance().getProperty("BATCH_CACHE_TTL_MINUTES"));
@@ -87,6 +88,15 @@ public class BatchCacheHandlerV2 {
                             Date updatedDate = (Date) fetchedContent.get(JsonKey.UPDATED_DATE);
                             String formattedUpdatedDate = new SimpleDateFormat("yyyy-MM-dd").format(updatedDate);
                             fetchedContent.put(JsonKey.UPDATED_DATE, formattedUpdatedDate);
+                        }
+                        Object batchAttrObj = fetchedContent.get(JsonKey.BATCH_ATTRIBUTES);
+                        if (batchAttrObj instanceof String && batchAttrObj != null) {
+                            try {
+                                Map<String, Object> attrMap = mapper.readValue((String) batchAttrObj, Map.class);
+                                fetchedContent.put(JsonKey.BATCH_ATTRIBUTES, attrMap);
+                            } catch (Exception e) {
+                                logger.error(null,"Failed to parse batch_attributes JSON for batchId: " + batchId, e);
+                            }
                         }
                         batchCache.put(batchId, fetchedContent);
                         return fetchedContent;
