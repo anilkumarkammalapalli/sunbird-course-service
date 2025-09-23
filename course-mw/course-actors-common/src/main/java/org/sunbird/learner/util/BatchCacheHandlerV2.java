@@ -90,9 +90,9 @@ public class BatchCacheHandlerV2 {
                             fetchedContent.put(JsonKey.UPDATED_DATE, formattedUpdatedDate);
                         }
                         Object batchAttrObj = fetchedContent.get(JsonKey.BATCH_ATTRIBUTES);
-                        if (batchAttrObj instanceof String && batchAttrObj != null) {
+                        if (batchAttrObj != null && batchAttrObj instanceof String) {
                             try {
-                                Map<String, Object> attrMap = mapper.readValue((String) batchAttrObj, Map.class);
+                                Map<String, Object> attrMap = mapper.readValue((String) batchAttrObj, new TypeReference<Map<String, Object>>() {});
                                 fetchedContent.put(JsonKey.BATCH_ATTRIBUTES, attrMap);
                             } catch (Exception e) {
                                 logger.error(null,"Failed to parse batch_attributes JSON for batchId: " + batchId, e);
