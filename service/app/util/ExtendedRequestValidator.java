@@ -111,6 +111,7 @@ public class ExtendedRequestValidator {
                 }
 
                 Map<String, Object> languageMapV1 = (Map<String, Object>) courseDetails.get(JsonKey.LANGUAGE_MAP);
+                List<String> courseLanguages = (List<String>) courseDetails.get(JsonKey.LANGUAGE);
 
                 String incomingLanguage = (String) map.get(JsonKey.LANGUAGE);
                 Map<String, Object> enrolmentData = fetchEnrolmentData(
@@ -126,22 +127,27 @@ public class ExtendedRequestValidator {
                         throw new ProjectCommonException(
                                 ResponseCode.languageRequired.getErrorCode(),
                                 ResponseCode.languageRequired.getErrorMessage(),
-                                ERROR_CODE
-                        );
-                    } else {
-                        incomingLanguage = recentLanguage.toLowerCase();
+                                ERROR_CODE);
                     }
-                } else {
-                    incomingLanguage = incomingLanguage.toLowerCase();
-                    if (MapUtils.isNotEmpty(languageMapV1)) {
-                        if (!languageMapV1.containsKey(incomingLanguage)) {
-                            throw new ProjectCommonException(
-                                    ResponseCode.languageRequired.getErrorCode(),
-                                    ResponseCode.languageRequired.getErrorMessage(),
-                                    ERROR_CODE
-                            );
-                        }
-                    }
+                    incomingLanguage = recentLanguage;
+                }
+                incomingLanguage = incomingLanguage.toLowerCase();
+                boolean validLanguage = false;
+                if (MapUtils.isNotEmpty(languageMapV1)) {
+                    validLanguage = languageMapV1.containsKey(incomingLanguage);
+                } else if (CollectionUtils.isNotEmpty(courseLanguages)) {
+                    final String validatedLanguage = incomingLanguage;
+                    validLanguage = courseLanguages.stream()
+                            .filter(StringUtils::isNotBlank)
+                            .map(String::toLowerCase)
+                            .anyMatch(lang -> lang.equals(validatedLanguage));
+                }
+
+                if (!validLanguage) {
+                    throw new ProjectCommonException(
+                            ResponseCode.languageRequired.getErrorCode(),
+                            ResponseCode.languageRequired.getErrorMessage(),
+                            ERROR_CODE);
                 }
                 map.put(JsonKey.LANGUAGE, incomingLanguage);
             }
