@@ -35,6 +35,7 @@ import javax.inject.{Inject, Named}
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters.asScalaBufferConverter
 import scala.collection.JavaConverters._
+import scala.util.Try
 
 class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-actor") courseBatchNotificationActorRef: ActorRef)(implicit val cacheUtil: RedisCacheUtil)
   extends BaseEnrolmentActor {
@@ -73,6 +74,10 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
 
   dateFormatter.setTimeZone(
     TimeZone.getTimeZone(ProjectUtil.getConfigValue(JsonKey.SUNBIRD_TIMEZONE)))
+
+  private val enrolmentDictionaryCacheTtl =
+    Try(ProjectUtil.getConfigValue("enrolment_dictionary_cache_ttl").toInt)
+      .getOrElse(600)
 
   override def preStart { println("Starting ExtendedCourseEnrollmentActor") }
 
@@ -144,6 +149,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     if (hasAccess) {
       upsertEnrollment(userId, courseId, batchId, data, dataBatch, existingEnrolmentForTheBatch == null, request.getRequestContext)
       cacheUtil.delete(getCacheKey(userId))
+      cacheUtil.delete(getEnrolmentDictionaryCacheKey(userId))
       sender().tell(successResponse(), self)
       logger.info(request.getRequestContext,
         s"Enrollment successful | courseId=$courseId, batchId=$batchId, userId=$userId")
@@ -287,6 +293,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     }
   }
 
+  def getEnrolmentDictionaryCacheKey(userId: String) = s"$userId:${ProjectUtil.getConfigValue("enrolment_dictionary_cache_key_prefix")}"
   def getCacheKey(userId: String) = s"$userId:user-enrolments"
 
 
@@ -970,6 +977,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     upsertEnrollment(userId, programId, batchId, data, dataBatch, (null == enrolmentData), request.getRequestContext)
     logger.info(request.getRequestContext, "ProgramEnrolmentActor :: enroll :: Deleting redis for key " + getCacheKey(userId))
     cacheUtil.delete(getCacheKey(userId))
+    cacheUtil.delete(getEnrolmentDictionaryCacheKey(userId))
     generatePreProcessorKafkaEvent(request,batchId, programId, userId)
     sender().tell(successResponse(), self)
     generateTelemetryAudit(userId, programId, batchId, data, "enrol", JsonKey.CREATE, request.getContext)
@@ -1132,6 +1140,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       upsertEnrollment(userId, courseId, batchId, data, dataBatch, (null == enrolmentData), request.getRequestContext)
       logger.info(request.getRequestContext, "CourseEnrolmentActor :: enroll :: Deleting redis for key " + getCacheKey(userId))
       cacheUtil.delete(getCacheKey(userId))
+      cacheUtil.delete(getEnrolmentDictionaryCacheKey(userId))
       sender().tell(successResponse(), self)
       generateTelemetryAudit(userId, courseId, batchId, data, "enrol", JsonKey.CREATE, request.getContext)
       notifyUser(userId, batchData, JsonKey.ADD, courseLanguage)
@@ -1250,6 +1259,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
         incrementBatchApprovedCount(batchId, request.getRequestContext)
         logger.info(request.getRequestContext, "ProgramEnrolmentActor :: enroll :: Deleting redis for key " + getCacheKey(userId))
         cacheUtil.delete(getCacheKey(userId))
+        cacheUtil.delete(getEnrolmentDictionaryCacheKey(userId))
         generatePreProcessorKafkaEvent(request, batchId, programId, userId)
         generateTelemetryAudit(userId, programId, batchId, data, "enrol", JsonKey.CREATE, request.getContext)
         notifyUser(userId, batchData, JsonKey.ADD, courseLanguage)
@@ -1457,6 +1467,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       upsertEnrollment(userId, courseId, batchId, data, dataBatch, (null == existingEnrolmentForTheBatch), request.getRequestContext)
       logger.info(request.getRequestContext, "CourseEnrolmentActor :: enroll :: Deleting redis for key " + getCacheKey(userId))
       cacheUtil.delete(getCacheKey(userId))
+      cacheUtil.delete(getEnrolmentDictionaryCacheKey(userId))
       generateTelemetryAudit(userId, courseId, batchId, data, "enrol", JsonKey.CREATE, request.getContext)
       notifyUser(userId, batchData, JsonKey.ADD , recentLanguage)
     } catch {
@@ -1741,6 +1752,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       )
       logger.info(request.getRequestContext, "ExtendedCourseEnrollmentActor :: unEnroll :: Deleting redis for key " + getCacheKey(userId))
       cacheUtil.delete(getCacheKey(userId))
+      cacheUtil.delete(getEnrolmentDictionaryCacheKey(userId))
       sender().tell(successResponse(), self)
       generateTelemetryAudit(userId, courseId, batchId, data, "unenrol", JsonKey.UPDATE, request.getContext)
       notifyUser(userId, batchData, JsonKey.REMOVE, "")
@@ -1900,6 +1912,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
         requestContext = request.getRequestContext
       )
       cacheUtil.delete(getCacheKey(userId))
+      cacheUtil.delete(getEnrolmentDictionaryCacheKey(userId))
       sender().tell(successResponse(), self)
       logger.info(request.getRequestContext, s"Re-enrollment successful | courseId=$courseId, batchId=$batchId, userId=$userId")
 
@@ -2057,55 +2070,51 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
   def enrolmentDictionary(request: Request): Unit = {
     try {
       val userId = request.get(JsonKey.USER_ID).asInstanceOf[String]
-      val courseIds = request.get(JsonKey.IDENTIFIER)
-        .asInstanceOf[java.util.List[String]]
-
-      val distinctCourseIds = courseIds.asScala.distinct
-
-      logger.info(request.getRequestContext,
-        s"enrolmentDictionary :: userId=$userId courseIds=$distinctCourseIds")
-
       if (StringUtils.isBlank(userId)) {
         ProjectCommonException.throwClientErrorException(
           ResponseCode.invalidRequestData, "userId is required")
       }
+      logger.info(request.getRequestContext,
+        s"enrolmentDictionary :: userId=$userId")
 
-      if (CollectionUtils.isEmpty(distinctCourseIds)) {
-        ProjectCommonException.throwClientErrorException(
-          ResponseCode.invalidRequestData, "identifier list is required")
+      val redisKey = getEnrolmentDictionaryCacheKey(userId)
+      val cachedResponse = cacheUtil.get(redisKey)
+      if (StringUtils.isNotBlank(cachedResponse)) {
+        logger.info(request.getRequestContext,
+          s"enrolmentDictionary :: cache HIT for userId=$userId")
+        val cached = mapper.readValue(cachedResponse,
+          new java.util.HashMap[String, java.util.Map[String, AnyRef]]().getClass)
+        sendResponse(JsonKey.RESPONSE, cached)
+        return
       }
 
-      val result = distinctCourseIds.map { courseId =>
-        val courseContent = try {
-          if (StringUtils.isNotBlank(courseId))
-            getCourseContent(courseId)
-          else null
-        } catch {
-          case e: Exception =>
-            logger.error(request.getRequestContext,
-              s"Error fetching content for courseId=$courseId", e)
-            null
+      logger.info(request.getRequestContext,
+        s"enrolmentDictionary :: cache MISS for userId=$userId")
+      val enrolments = userCoursesDao.listEnrolments_v2(
+        request.getRequestContext, userId, null)
+      if (CollectionUtils.isEmpty(enrolments)) {
+        logger.info(request.getRequestContext,
+          s"enrolmentDictionary :: no enrollments for userId=$userId")
+        sendResponse(JsonKey.RESPONSE,
+          new java.util.HashMap[String, java.util.Map[String, AnyRef]]())
+        return
+      }
+
+
+      val result = new java.util.HashMap[String, AnyRef]()
+      enrolments.asScala
+        .filter(e => Option(e.get(JsonKey.COURSE_ID))
+          .exists(id => StringUtils.isNotBlank(id.asInstanceOf[String])))
+        .groupBy(_.get(JsonKey.COURSE_ID).asInstanceOf[String])
+        .foreach { case (courseId, enrolList) =>
+          val courseContent = Try(getCourseContent(courseId)).getOrElse(null)
+          result.put(courseId, buildContentMap(enrolList.head, courseContent))
         }
 
-        val contentInfo = new java.util.HashMap[String, AnyRef]()
-        if (contentInfo != null) {
-          contentInfo.put(JsonKey.COURSECATEGORY,
-            courseContent.getOrDefault(JsonKey.COURSECATEGORY, ""))
-          contentInfo.put(JsonKey.STATUS,
-            courseContent.getOrDefault(JsonKey.STATUS, ""))
-          contentInfo.put(JsonKey.PRIMARYCATEGORY,
-            courseContent.getOrDefault(JsonKey.PRIMARYCATEGORY, ""))
-        }
-
-        val responseMap = new java.util.HashMap[String, AnyRef]()
-        responseMap.put(JsonKey.IDENTIFIER, courseId)
-        responseMap.put(JsonKey.CONTENT, contentInfo)
-        responseMap
-      }.asJava
-
-      val resp = new Response()
-      resp.put(JsonKey.RESPONSE, result)
-      sender().tell(resp, self)
+      cacheUtil.set(redisKey, mapper.writeValueAsString(result), enrolmentDictionaryCacheTtl)
+      logger.info(request.getRequestContext,
+        s"enrolmentDictionary :: cached for userId=$userId")
+      sendResponse(JsonKey.RESPONSE, result)
 
     } catch {
       case e: ProjectCommonException =>
@@ -2117,6 +2126,24 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
           s"enrolmentDictionary :: Exception :: ${e.getMessage}", e)
         sender().tell(e, self)
     }
+  }
+
+  private def sendResponse(key: String, value: AnyRef): Unit = {
+    val resp = new Response()
+    resp.put(key, value)
+    sender().tell(resp, self)
+  }
+
+  private def buildContentMap(enrolment: java.util.Map[String, AnyRef],
+                              courseContent: java.util.Map[String, AnyRef]): java.util.HashMap[String, AnyRef] = {
+    val contentMap = new java.util.HashMap[String, AnyRef]()
+    contentMap.put(JsonKey.COURSECATEGORY,
+      if (courseContent != null) courseContent.getOrDefault(JsonKey.COURSECATEGORY, "") else "")
+    contentMap.put(JsonKey.PRIMARYCATEGORY,
+      if (courseContent != null) courseContent.getOrDefault(JsonKey.PRIMARYCATEGORY, "") else "")
+    contentMap.put(JsonKey.STATUS, enrolment.getOrDefault(JsonKey.STATUS, 0.asInstanceOf[AnyRef]))
+    contentMap.put(JsonKey.ACTIVE, enrolment.get(JsonKey.ACTIVE))
+    contentMap
   }
 
 }

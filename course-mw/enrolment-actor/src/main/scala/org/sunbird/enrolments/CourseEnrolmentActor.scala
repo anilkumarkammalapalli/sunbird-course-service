@@ -118,6 +118,7 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
             upsertEnrollment(userId, courseId, batchId, data, dataBatch, (null == existingEnrolmentForTheBatch), request.getRequestContext)
             logger.info(request.getRequestContext, "CourseEnrolmentActor :: enroll :: Deleting redis for key " + getCacheKey(userId))
             cacheUtil.delete(getCacheKey(userId))
+            cacheUtil.delete(getEnrolmentDictionaryCacheKey(userId))
             sender().tell(successResponse(), self)
             generateTelemetryAudit(userId, courseId, batchId, data, "enrol", JsonKey.CREATE, request.getContext)
             notifyUser(userId, batchData, JsonKey.ADD)
@@ -152,6 +153,7 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
             upsertEnrollment(userId,courseId, batchId, data, dataBatch, false, request.getRequestContext)
             logger.info(request.getRequestContext, "CourseEnrolmentActor :: unEnroll :: Deleting redis for key " + getCacheKey(userId))
             cacheUtil.delete(getCacheKey(userId))
+            cacheUtil.delete(getEnrolmentDictionaryCacheKey(userId))
             sender().tell(successResponse(), self)
             generateTelemetryAudit(userId, courseId, batchId, data, "unenrol", JsonKey.UPDATE, request.getContext)
             notifyUser(userId, batchData, JsonKey.REMOVE)
@@ -189,6 +191,7 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
             upsertEnrollment(userId, courseId, batchId, data, dataBatch, (null == enrolmentData), request.getRequestContext)
             logger.info(request.getRequestContext, "CourseEnrolmentActor :: enroll :: Deleting redis for key " + getCacheKey(userId))
             cacheUtil.delete(getCacheKey(userId))
+            cacheUtil.delete(getEnrolmentDictionaryCacheKey(userId))
             sender().tell(successResponse(), self)
             generateTelemetryAudit(userId, courseId, batchId, data, "enrol", JsonKey.CREATE, request.getContext)
             notifyUser(userId, batchData, JsonKey.ADD)
@@ -493,6 +496,8 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
 
     def getCacheKey(userId: String) = s"$userId:user-enrolments"
 
+    def getEnrolmentDictionaryCacheKey(userId: String) = s"$userId:${ProjectUtil.getConfigValue("enrolment_dictionary_cache_key_prefix")}"
+
     def getCachedEnrolmentList(userId: String, handleEmptyCache: () => Response): Response = {
         val key = getCacheKey(userId)
         val responseString = cacheUtil.get(key)
@@ -658,6 +663,7 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
         upsertEnrollment(userId, programId, batchId, data, dataBatch, (null == enrolmentData), request.getRequestContext)
         logger.info(request.getRequestContext, "ProgramEnrolmentActor :: enroll :: Deleting redis for key " + getCacheKey(userId))
         cacheUtil.delete(getCacheKey(userId))
+        cacheUtil.delete(getEnrolmentDictionaryCacheKey(userId))
         generatePreProcessorKafkaEvent(request,batchId, programId, userId)
         sender().tell(successResponse(), self)
         generateTelemetryAudit(userId, programId, batchId, data, "enrol", JsonKey.CREATE, request.getContext)
@@ -754,6 +760,7 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
             upsertEnrollment(userId, courseId, batchId, data, dataBatch, (null == existingEnrolmentForTheBatch), request.getRequestContext)
             logger.info(request.getRequestContext, "CourseEnrolmentActor :: enroll :: Deleting redis for key " + getCacheKey(userId))
             cacheUtil.delete(getCacheKey(userId))
+            cacheUtil.delete(getEnrolmentDictionaryCacheKey(userId))
             generateTelemetryAudit(userId, courseId, batchId, data, "enrol", JsonKey.CREATE, request.getContext)
             notifyUser(userId, batchData, JsonKey.ADD)
         } catch {
@@ -915,6 +922,7 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
                 upsertEnrollment(userId, programId, batchId, data, dataBatch, (null == enrolmentData), request.getRequestContext)
                 logger.info(request.getRequestContext, "ProgramEnrolmentActor :: enroll :: Deleting redis for key " + getCacheKey(userId))
                 cacheUtil.delete(getCacheKey(userId))
+                cacheUtil.delete(getEnrolmentDictionaryCacheKey(userId))
                 generatePreProcessorKafkaEvent(request, batchId, programId, userId)
                 generateTelemetryAudit(userId, programId, batchId, data, "enrol", JsonKey.CREATE, request.getContext)
                 notifyUser(userId, batchData, JsonKey.ADD)

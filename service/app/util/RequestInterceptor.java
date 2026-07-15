@@ -56,7 +56,6 @@ public class RequestInterceptor {
     apiHeaderIgnoreMap.put("/private/v1/user/enrol/courses/list/:uid", var);
     apiHeaderIgnoreMap.put("/v2/blended/program/admin/enroll", var);
     apiHeaderIgnoreMap.put("/v2/course/admin/enroll", var);
-    apiHeaderIgnoreMap.put("/v1/user/enrol/dictionary", var);
   }
 
   /**
