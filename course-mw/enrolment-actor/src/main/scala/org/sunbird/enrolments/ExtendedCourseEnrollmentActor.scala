@@ -2090,13 +2090,29 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
 
       logger.info(request.getRequestContext,
         s"enrolmentDictionary :: cache MISS for userId=$userId")
-      val enrolments = userCoursesDao.listEnrolments_v2(
-        request.getRequestContext, userId, null)
+          val primaryKey = new java.util.HashMap[String, AnyRef]()
+                primaryKey.put(JsonKey.USER_ID, userId)
+
+                val response = cassandraOperation.getRecordByIdentifier(
+                  request.getRequestContext,
+                  enrolmentDBInfo.getKeySpace,
+                  enrolmentDBInfo.getTableName,
+                  primaryKey,
+                  java.util.Arrays.asList(
+                    JsonKey.COURSE_ID,
+                    JsonKey.STATUS,
+                    JsonKey.ACTIVE
+                  )
+                );
+
+                val enrolments = response.get(JsonKey.RESPONSE).asInstanceOf[java.util.List[java.util.Map[String, AnyRef]]]
+
       if (CollectionUtils.isEmpty(enrolments)) {
         logger.info(request.getRequestContext,
           s"enrolmentDictionary :: no enrollments for userId=$userId")
-        sendResponse(JsonKey.RESPONSE,
-          new java.util.HashMap[String, java.util.Map[String, AnyRef]]())
+        val emptyResult = new java.util.HashMap[String, java.util.Map[String, AnyRef]]()
+        cacheUtil.set(redisKey, mapper.writeValueAsString(emptyResult), enrolmentDictionaryCacheTtl)
+        sendResponse(JsonKey.RESPONSE, emptyResult)
         return
       }
 
