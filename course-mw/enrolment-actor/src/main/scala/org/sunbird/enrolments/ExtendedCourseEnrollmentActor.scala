@@ -6,7 +6,7 @@ import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import org.apache.commons.collections4.{CollectionUtils, MapUtils}
 import org.apache.commons.lang3.StringUtils
 import org.sunbird.cache.util.RedisCacheUtil
-import org.sunbird.common.{CassandraUtil, Constants}
+import org.sunbird.common.{CassandraUtil, Constants, ElasticSearchHelper}
 import org.sunbird.common.exception.ProjectCommonException
 import org.sunbird.common.models.response.Response
 import org.sunbird.common.models.util.ProjectUtil.{EnrolmentType, getConfigValue, isNull}
@@ -19,7 +19,7 @@ import org.sunbird.learner.actors.course.dao.impl.ContentHierarchyDaoImpl
 import org.sunbird.learner.actors.coursebatch.dao.impl.{BatchUserDaoImpl, CourseBatchDaoImpl, UserCoursesDaoImpl}
 import org.sunbird.learner.actors.coursebatch.dao.{BatchUserDao, CourseBatchDao, UserCoursesDao}
 import org.sunbird.learner.actors.coursebatch.service.UserCoursesService
-import org.sunbird.learner.util.{BatchCacheHandlerV2, ContentCacheHandlerV2, ContentUtil, CourseBatchSchedulerUtil, ExtendedUtil, JsonUtil, Util}
+import org.sunbird.learner.util.{BatchCacheHandlerV2, ContentCacheHandlerV2, ContentUtil, CourseBatchSchedulerUtil, ExtendedUtil, HelperMethodService, JsonUtil, Util}
 import org.sunbird.models.batch.user.BatchUser
 import org.sunbird.models.course.batch.CourseBatch
 import org.sunbird.models.user.courses.UserCourses
@@ -71,6 +71,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
   private val badgeDbInfo = ExtendedUtil.dbInfoMap.get(ExtendedUtil.USER_BADGE_LOOKUP_DB)
   val dateFormatter = ProjectUtil.getDateFormatter
   private val userCoursesService = new UserCoursesService
+  private val orgEligibilityIndex = ProjectUtil.getConfigValue(JsonKey.ORG_ELIGIBILITY_INDEX)
 
   dateFormatter.setTimeZone(
     TimeZone.getTimeZone(ProjectUtil.getConfigValue(JsonKey.SUNBIRD_TIMEZONE)))
@@ -158,6 +159,14 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       generateTelemetryAudit(userId, courseId, batchId, data, "enrol", JsonKey.CREATE, request.getContext)
       val recentLanguage = data.getOrDefault(JsonKey.RECENT_LANGUAGE, "").asInstanceOf[String]
       notifyUser(userId, batchData, JsonKey.ADD, recentLanguage)
+      val dataMap = new java.util.HashMap[String, AnyRef]
+      val requestMap = new java.util.HashMap[String, AnyRef]
+      requestMap.put(JsonKey.COURSE_ID, courseId)
+      requestMap.put(JsonKey.USER_ID, userId)
+      requestMap.put(JsonKey.BATCH_ID, batchId)
+      dataMap.put("edata", requestMap)
+      val topic = ProjectUtil.getConfigValue("kafka_user_enrolment_event_topic")
+      InstructionEventGenerator.createCourseEnrolmentEvent("", topic, dataMap)
     } else {
       ProjectCommonException.throwClientErrorException(ResponseCode.accessDeniedToEnrolOrUnenrolCourse, courseId)
     }
@@ -424,7 +433,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     }
   }
 
-  def getEnrolmentList(request: Request, userId: String, isDetailsRequired: Boolean, isProgressEnabled: Boolean): Response = {
+  def getEnrolmentList(request: Request, userId: String, isDetailsRequired: Boolean, isProgressEnabled: Boolean, includeInactiveEnrolments: Boolean = false): Response = {
     try {
       logger.info(request.getRequestContext, "ExtendedCourseEnrollmentActor :: getEnrolmentList :: fetching data from cassandra with userId " + userId)
 
@@ -436,7 +445,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       }
       val isUnenrolledRequest = status != null && status.exists(_.equalsIgnoreCase("Unenrolled"))
 
-      val activeEnrolments: java.util.List[java.util.Map[String, AnyRef]] = getActiveEnrollments(userId, request)
+      val activeEnrolments: java.util.List[java.util.Map[String, AnyRef]] = getActiveEnrollments(userId, request, includeInactiveEnrolments)
       var isMoreThanOneCourse: Boolean = false
       if (request.get(Constants.COURSE_ID) != null) {
         val courseIdListFromRequest = request.get(Constants.COURSE_ID).asInstanceOf[java.util.List[String]]
@@ -490,7 +499,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     }
   }
 
-  def getActiveEnrollments(userId: String, request: Request): java.util.List[java.util.Map[String, AnyRef]] = {
+  def getActiveEnrollments(userId: String, request: Request, includeInactiveEnrolments: Boolean = false): java.util.List[java.util.Map[String, AnyRef]] = {
     isRetiredCoursesIncludedInEnrolList = if (request.get(JsonKey.RETIRED_COURE_ENABLED) != null)
       request.get(JsonKey.RETIRED_COURE_ENABLED).asInstanceOf[Boolean] else false
     val courseIdList:  java.util.List[String] = new java.util.ArrayList()
@@ -542,7 +551,9 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
           .asJava
 
       } else {
-        enrolments = enrolments.filter(e => e.getOrDefault(JsonKey.ACTIVE, false.asInstanceOf[AnyRef]).asInstanceOf[Boolean]).toList.asJava
+        if (!includeInactiveEnrolments) {
+          enrolments = enrolments.filter(e => e.getOrDefault(JsonKey.ACTIVE, false.asInstanceOf[AnyRef]).asInstanceOf[Boolean]).toList.asJava
+        }
         if (status != null && status.nonEmpty && status.exists(s => statusMap.contains(s))) {
           for (statusValue <- status) {
             if (statusMap.get(statusValue).contains(1)) {
@@ -1291,7 +1302,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     val userId = request.get(JsonKey.USER_ID).asInstanceOf[String]
     logger.info(request.getRequestContext, "ExtendedCourseEnrollmentActor :: list :: UserId = " + userId)
     try {
-      val response = getEnrolmentList(request, userId, true, true)
+      val response = getEnrolmentList(request, userId, true, true, includeInactiveEnrolments = true)
       sender().tell(response, self)
     } catch {
       case e: Exception =>
@@ -1755,7 +1766,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       cacheUtil.delete(getEnrolmentDictionaryCacheKey(userId))
       sender().tell(successResponse(), self)
       generateTelemetryAudit(userId, courseId, batchId, data, "unenrol", JsonKey.UPDATE, request.getContext)
-      notifyUser(userId, batchData, JsonKey.REMOVE, "")
+      notifyUserInAppOnly(userId, batchData, "unenroll", request.getRequestContext)
       val topic = ProjectUtil.getConfigValue(JsonKey.DEV_USER_UNENROLMENT_EVENT_TOPIC)
       publishKarmaPointsReversalEvent(topic,userId,courseId,batchId,request.getRequestContext)
       cacheUtil.delete(getCacheBatchKey(batchId))
@@ -1873,6 +1884,8 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
 
     // Dedicated validation
     validateReEnrollment(batchData, enrolmentData)
+    // Volunteers may re-enroll only into courses eligible for their root org
+    validateVolunteerEligibility(userId, courseId, request.getRequestContext)
     // Existing inactive enrollment
     val existingEnrolment = enrolmentData.asScala.find(_.getBatchId == batchId).orNull
 
@@ -1920,7 +1933,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       generateTelemetryAudit(userId, courseId, batchId, data, "reenrol", JsonKey.UPDATE, request.getContext)
 
       // Notification
-      notifyUser(userId, batchData, JsonKey.ADD, recentLang)
+      notifyUserInAppOnly(userId, batchData, "reenroll", request.getRequestContext)
       val dataMap = new java.util.HashMap[String, AnyRef]
       val requestMap = new java.util.HashMap[String, AnyRef]
       requestMap.put(JsonKey.COURSE_ID,courseId)
@@ -2067,6 +2080,121 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     InstructionEventGenerator.pushInstructionEvent(topic, event)
   }
 
+  def notifyUserInAppOnly(userId: String, batchData: CourseBatch, actionType: String, requestContext: RequestContext): Unit = {
+    val isNotifyUser = java.lang.Boolean.parseBoolean(PropertiesCache.getInstance().getProperty(JsonKey.SUNBIRD_COURSE_UNENROLL_AND_REENROLL_NOTIFICATIONS_ENABLED))
+    if (isNotifyUser) {
+      try {
+        val subCategory = if (actionType.equalsIgnoreCase("reenroll")) {
+          JsonKey.ENROLLMENT_REENROLL
+        } else {
+          JsonKey.ENROLLMENT_UNENROLL
+        }
+        val placeholders = new java.util.HashMap[String, AnyRef]()
+        placeholders.put(JsonKey.COURSE_NAME, batchData.getName)
+
+        val data = new java.util.HashMap[String, AnyRef]()
+        data.put(JsonKey.ID, batchData.getCourseId)
+
+        val message = new java.util.HashMap[String, AnyRef]()
+        message.put(JsonKey.DATA, data)
+        message.put(JsonKey.PLACE_HOLDERS, placeholders)
+
+        val helperMethodService = new HelperMethodService()
+        helperMethodService.sendNotification(
+          subCategory,
+          JsonKey.ALERT,
+          java.util.Arrays.asList(userId),
+          message
+        )
+
+        logger.info(requestContext,
+          s"notifyUserInAppOnly :: Sent $actionType in-app notification for userId=$userId, batchId=${batchData.getBatchId}")
+      } catch {
+        case e: Exception =>
+          logger.error(requestContext,
+            s"notifyUserInAppOnly :: Failed to send in-app notification: ${e.getMessage}", e)
+      }
+    }
+  }
+
+  // Volunteers may re-enroll only into courses explicitly marked eligible for their root org
+  private def validateVolunteerEligibility(userId: String, courseId: String, requestContext: RequestContext): Unit = {
+    val (rootOrgId, roles) = getUserRootOrgAndRoles(userId, requestContext)
+    if (isVolunteerUser(roles) && !isCourseEligibleForOrg(rootOrgId, courseId, requestContext)) {
+      logger.warn(requestContext, s"Volunteer re-enrollment validation failed for userId=$userId, rootOrgId=$rootOrgId, courseId=$courseId", null)
+      ProjectCommonException.throwClientErrorException(
+        ResponseCode.userNotEligibleForReEnrollment,
+        ResponseCode.userNotEligibleForReEnrollment.getErrorMessage
+      )
+    }
+  }
+
+  private def getUserRootOrgAndRoles(userId: String, requestContext: RequestContext): (String, util.List[String]) = {
+    // Fetch rootOrgId from user table
+    val userResponse = cassandraOperation.getRecordByIdentifier(
+      requestContext,
+      JsonKey.KEYSPACE_SUNBIRD,
+      JsonKey.TABLE_USER,
+      userId,
+      util.Arrays.asList(JsonKey.ROOT_ORG_ID)
+    )
+    val userRecords = userResponse.getResult
+      .getOrDefault(JsonKey.RESPONSE, new util.ArrayList[util.Map[String, AnyRef]]())
+      .asInstanceOf[util.List[util.Map[String, AnyRef]]]
+
+    val rootOrgId =
+      if (CollectionUtils.isEmpty(userRecords)) {
+        ""
+      } else {
+        Option(userRecords.get(0).get(JsonKey.ROOT_ORG_ID))
+          .map(_.toString)
+          .getOrElse("")
+      }
+
+    // Fetch roles from user_roles table (one row per role, not a list column)
+    val roleFilters = Map[String, AnyRef](JsonKey.USER_ID -> userId).asJava
+    val rolesResponse = cassandraOperation.getRecordsByProperties(
+      JsonKey.KEYSPACE_SUNBIRD,
+      JsonKey.TABLE_USER_ROLES,
+      roleFilters,
+      util.Arrays.asList(JsonKey.ROLE),
+      requestContext
+    )
+    val roleRecords = rolesResponse.getResult
+      .getOrDefault(JsonKey.RESPONSE, new util.ArrayList[util.Map[String, AnyRef]]())
+      .asInstanceOf[util.List[util.Map[String, AnyRef]]]
+    val roles = new util.ArrayList[String]()
+
+    if (!CollectionUtils.isEmpty(roleRecords)) {
+      roleRecords.asScala.foreach { record =>
+        Option(record.get(JsonKey.ROLE)).foreach(role => roles.add(role.toString))
+      }
+    }
+
+    (rootOrgId, roles)
+  }
+
+  private def isVolunteerUser(roles: util.List[String]): Boolean = {
+    !CollectionUtils.isEmpty(roles) &&
+      roles.asScala.exists(role => JsonKey.ROLE_VOLUNTEER.equalsIgnoreCase(role))
+  }
+
+  // Reads the org-eligibility document (same ES index used by sunbird-cb-ext) for rootOrgId;
+  // a missing document, or a courseId absent from its courseIds list, means the org is not eligible
+  private def isCourseEligibleForOrg(rootOrgId: String, courseId: String, requestContext: RequestContext): Boolean = {
+    val future = esService.getDataByIdentifier(requestContext, orgEligibilityIndex, rootOrgId)
+    val eligibility = ElasticSearchHelper.getResponseFromFuture(future).asInstanceOf[java.util.Map[String, AnyRef]]
+
+    if (MapUtils.isEmpty(eligibility)) {
+      logger.info(requestContext, s"No org eligibility data found for rootOrgId=$rootOrgId")
+      false
+    } else {
+      val courseIds = Option(eligibility.get(JsonKey.COURSE_IDS))
+        .map(_.asInstanceOf[util.List[String]])
+        .getOrElse(new util.ArrayList[String]())
+      !CollectionUtils.isEmpty(courseIds) && courseIds.contains(courseId)
+    }
+  }
   def enrolmentDictionary(request: Request): Unit = {
     try {
       val userId = request.get(JsonKey.USER_ID).asInstanceOf[String]
