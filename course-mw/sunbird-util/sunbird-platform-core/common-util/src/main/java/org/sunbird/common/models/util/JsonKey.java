@@ -1342,5 +1342,7 @@ public final class JsonKey {
   public static final String ROLE_VOLUNTEER = "VOLUNTEER";
   public static final String ORG_ELIGIBILITY_INDEX="org_eligibility_index";
   public static final String TABLE_USER_ROLES = "user_roles";
+  public static final String ENROLMENT_DICTIONARY_CACHE_KEY_PREFIX = "enrolment_dictionary_cache_key_prefix";
+  public static final String ENROLMENT_DICTIONARY_CACHE_TTL = "enrolment_dictionary_cache_ttl";
   private JsonKey() {}
 }

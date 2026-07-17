@@ -77,8 +77,9 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     TimeZone.getTimeZone(ProjectUtil.getConfigValue(JsonKey.SUNBIRD_TIMEZONE)))
 
   private val enrolmentDictionaryCacheTtl =
-    Try(ProjectUtil.getConfigValue("enrolment_dictionary_cache_ttl").toInt)
-      .getOrElse(600)
+    if (StringUtils.isNotBlank(ProjectUtil.getConfigValue(JsonKey.ENROLMENT_DICTIONARY_CACHE_TTL)))
+      ProjectUtil.getConfigValue(JsonKey.ENROLMENT_DICTIONARY_CACHE_TTL).toInt
+    else 600
 
   override def preStart { println("Starting ExtendedCourseEnrollmentActor") }
 
@@ -302,9 +303,8 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     }
   }
 
-  def getEnrolmentDictionaryCacheKey(userId: String) = s"$userId:${ProjectUtil.getConfigValue("enrolment_dictionary_cache_key_prefix")}"
+  def getEnrolmentDictionaryCacheKey(userId: String) = s"$userId:${ProjectUtil.getConfigValue(JsonKey.ENROLMENT_DICTIONARY_CACHE_KEY_PREFIX)}"
   def getCacheKey(userId: String) = s"$userId:user-enrolments"
-
 
   def generateTelemetryAudit(userId: String, courseId: String, batchId: String, data: java.util.Map[String, AnyRef], correlation: String, state: String, context: java.util.Map[String, AnyRef]): Unit = {
     val contextMap = new java.util.HashMap[String, AnyRef]()
