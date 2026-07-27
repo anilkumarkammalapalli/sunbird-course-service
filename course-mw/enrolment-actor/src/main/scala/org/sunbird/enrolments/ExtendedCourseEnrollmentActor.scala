@@ -35,6 +35,7 @@ import javax.inject.{Inject, Named}
 import scala.collection.JavaConversions._
 import scala.collection.JavaConverters.asScalaBufferConverter
 import scala.collection.JavaConverters._
+import scala.util.Try
 
 class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-actor") courseBatchNotificationActorRef: ActorRef)(implicit val cacheUtil: RedisCacheUtil)
   extends BaseEnrolmentActor {
