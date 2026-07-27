@@ -1344,5 +1344,10 @@ public final class JsonKey {
   public static final String TABLE_USER_ROLES = "user_roles";
   public static final String ENROLMENT_DICTIONARY_CACHE_KEY_PREFIX = "enrolment_dictionary_cache_key_prefix";
   public static final String ENROLMENT_DICTIONARY_CACHE_TTL = "enrolment_dictionary_cache_ttl";
+  public static final String COMPREHENSIVE_ASSESSMENT_PROGRAM = "Comprehensive Assessment Program";
+  public static final String CHILD_NODES = "childNodes";
+  public static final String CERTIFICATE_ID  = "certificateId";
+  public static final String ISSUEDCERTIFICATES = "issued_certificates";
+
   private JsonKey() {}
 }

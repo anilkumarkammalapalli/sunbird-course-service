@@ -2229,7 +2229,8 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
                   java.util.Arrays.asList(
                     JsonKey.COURSE_ID,
                     JsonKey.STATUS,
-                    JsonKey.ACTIVE
+                    JsonKey.ACTIVE,
+                    JsonKey.ISSUEDCERTIFICATES
                   )
                 );
 
@@ -2278,15 +2279,63 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     sender().tell(resp, self)
   }
 
-  private def buildContentMap(enrolment: java.util.Map[String, AnyRef],
-                              courseContent: java.util.Map[String, AnyRef]): java.util.HashMap[String, AnyRef] = {
+  private def buildContentMap(
+                               enrolment: java.util.Map[String, AnyRef],
+                               courseContent: java.util.Map[String, AnyRef]
+                             ): java.util.HashMap[String, AnyRef] = {
+
     val contentMap = new java.util.HashMap[String, AnyRef]()
-    contentMap.put(JsonKey.COURSECATEGORY,
-      if (courseContent != null) courseContent.getOrDefault(JsonKey.COURSECATEGORY, "") else "")
-    contentMap.put(JsonKey.PRIMARYCATEGORY,
-      if (courseContent != null) courseContent.getOrDefault(JsonKey.PRIMARYCATEGORY, "") else "")
-    contentMap.put(JsonKey.STATUS, enrolment.getOrDefault(JsonKey.STATUS, 0.asInstanceOf[AnyRef]))
+
+    val courseCategory =
+      if (courseContent != null)
+        courseContent.getOrDefault(JsonKey.COURSECATEGORY, "").toString
+      else
+        ""
+
+    contentMap.put(JsonKey.COURSECATEGORY, courseCategory)
+
+    contentMap.put(
+      JsonKey.PRIMARYCATEGORY,
+      if (courseContent != null)
+        courseContent.getOrDefault(JsonKey.PRIMARYCATEGORY, "")
+      else
+        ""
+    )
+
+    contentMap.put(
+      JsonKey.STATUS,
+      enrolment.getOrDefault(JsonKey.STATUS, Integer.valueOf(0))
+    )
+
     contentMap.put(JsonKey.ACTIVE, enrolment.get(JsonKey.ACTIVE))
+
+    val status = Option(enrolment.get(JsonKey.STATUS))
+      .map(_.toString.toInt)
+      .getOrElse(0)
+
+    if (status == 2) {
+      val issuedCertificates =
+        enrolment.get(JsonKey.ISSUED_CERTIFICATES)
+          .asInstanceOf[java.util.List[java.util.Map[String, String]]]
+
+      if (issuedCertificates != null && !issuedCertificates.isEmpty) {
+        val certificateId = issuedCertificates.get(0).get(JsonKey.IDENTIFIER)
+
+        if (StringUtils.isNotBlank(certificateId)) {
+          contentMap.put(JsonKey.CERTIFICATE_ID, certificateId)
+        }
+      }
+    }
+
+    if (JsonKey.COMPREHENSIVE_ASSESSMENT_PROGRAM.equalsIgnoreCase(courseCategory) && courseContent != null) {
+
+      val childNodes = courseContent.get(JsonKey.CHILD_NODES)
+
+      if (childNodes != null) {
+        contentMap.put(JsonKey.CHILD_NODES, childNodes)
+      }
+    }
+
     contentMap
   }
 
