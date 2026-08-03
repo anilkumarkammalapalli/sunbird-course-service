@@ -74,6 +74,8 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
   private val orgEligibilityIndex = ProjectUtil.getConfigValue(JsonKey.ORG_ELIGIBILITY_INDEX)
   private val learningHoursExcludedCourseCategories: Set[String] =
     getConfigValue(JsonKey.LEARNING_HOURS_EXCLUDED_COURSE_CATEGORIES).split(",").map(_.trim).toSet
+  private val learningHoursProgramCourseCategories: Set[String] =
+    getConfigValue(JsonKey.LEARNING_HOURS_PROGRAM_COURSE_CATEGORIES).split(",").map(_.trim).filter(_.nonEmpty).toSet
 
   dateFormatter.setTimeZone(
     TimeZone.getTimeZone(ProjectUtil.getConfigValue(JsonKey.SUNBIRD_TIMEZONE)))
@@ -662,6 +664,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       case category if learningHoursExcludedCourseCategories.contains(category) => 0
       case JsonKey.BLENDED_PROGRAM => calculateBlendedProgramDuration(courseContent, courseDetails, actorMessage)
       case JsonKey.COMPREHENSIVE_ASSESSMENT_PROGRAM => calculateCapProgramDuration(courseContent, courseDetails, actorMessage)
+      case category if learningHoursProgramCourseCategories.contains(category) => calculateProgramCourseDuration(courseContent, courseDetails, actorMessage)
       case _ => CourseBatchUtil.getDurationAsInt(courseContent, JsonKey.DURATION)
     }
   }
@@ -683,6 +686,14 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     if (CollectionUtils.isEmpty(children)) return programDuration
     val childrenSum = children.asScala.iterator.map(c => CourseBatchUtil.getDurationAsInt(c, JsonKey.DURATION)).sum
     math.max(0, programDuration - childrenSum)
+  }
+
+  private def calculateProgramCourseDuration(courseContent: java.util.Map[String, AnyRef], courseDetails: util.Map[String, AnyRef], actorMessage: Request): Int = {
+    var courseId = courseDetails.getOrDefault(JsonKey.COURSE_ID, "").asInstanceOf[String]
+    if (StringUtils.isBlank(courseId) && courseContent != null) {
+      courseId = courseContent.getOrDefault(JsonKey.IDENTIFIER, "").asInstanceOf[String]
+    }
+    CourseBatchUtil.calculateProgramCourseDuration(courseContent, courseId, actorMessage.getRequestContext)
   }
 
   def getUserEnrolmentExternalCourseInfo(externalEnrolmentFinalEnrolment: List[util.Map[String, AnyRef]], actorMessage: Request) = {

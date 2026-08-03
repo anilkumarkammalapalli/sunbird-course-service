@@ -1353,5 +1353,6 @@ public final class JsonKey {
   public static final String LEARNING_HOURS_EXCLUDED_COURSE_CATEGORIES = "learning_hours_excluded_course_categories";
   public static final String EXPECTED_DURATION = "expectedDuration";
   public static final String LEARNING_HOURS_ASSESSMENT_COURSE_CATEGORIES = "learning_hours_assessment_course_categories";
+  public static final String LEARNING_HOURS_PROGRAM_COURSE_CATEGORIES = "learning_hours_program_course_categories";
   private JsonKey() {}
 }
