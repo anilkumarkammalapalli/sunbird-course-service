@@ -370,6 +370,43 @@ public class CourseBatchUtil {
     return totalDuration;
   }
 
+  public static int calculateProgramCourseDuration(Map<String, Object> courseContent, String courseId, RequestContext requestContext) {
+    if (StringUtils.isBlank(courseId)) return 0;
+
+    Map<String, Object> hierarchyMap = getRedisHierarchyMap(courseId);
+    List<Map<String, Object>> children = getCourseChildren(courseId, hierarchyMap, courseContent, requestContext);
+
+    if (CollectionUtils.isEmpty(children)) return 0;
+
+    return calculateProgramChildrenDuration(children, getAssessmentDurationCourseCategories());
+  }
+
+  @SuppressWarnings("unchecked")
+  public static int calculateProgramChildrenDuration(List<Map<String, Object>> nodes, Set<String> assessmentCategories) {
+    if (CollectionUtils.isEmpty(nodes)) {
+      return 0;
+    }
+
+    int totalDuration = 0;
+    for (Map<String, Object> node : nodes) {
+      if (node == null) {
+        continue;
+      }
+
+      String category = String.valueOf(node.getOrDefault(JsonKey.PRIMARYCATEGORY, ""));
+      if (assessmentCategories.contains(category)) {
+        totalDuration += getDurationAsInt(node, JsonKey.EXPECTED_DURATION);
+      }
+
+      List<Map<String, Object>> children = (List<Map<String, Object>>) node.get(JsonKey.CHILDREN);
+      if (CollectionUtils.isNotEmpty(children)) {
+        totalDuration += calculateProgramChildrenDuration(children, assessmentCategories);
+      }
+    }
+
+    return totalDuration;
+  }
+
   @SuppressWarnings("unchecked")
   public static List<Map<String, Object>> getCourseChildren(String courseId, Map<String, Object> hierarchyMap,
           Map<String, Object> courseContent, RequestContext requestContext) {
