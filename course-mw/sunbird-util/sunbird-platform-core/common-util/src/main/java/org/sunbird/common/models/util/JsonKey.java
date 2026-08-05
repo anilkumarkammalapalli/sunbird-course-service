@@ -1335,7 +1335,7 @@ public final class JsonKey {
   public static final String ACTION_DATE = "actionDate";
   public static final String REASON ="reason";
   public static final String COMMENT = "comment";
-  public static final String DEV_USER_UNENROLMENT_EVENT_TOPIC = "dev_user_unenrolment_event";
+  public static final String USER_UNENROLMENT_EVENT_TOPIC = "user_unenrolment_event_topic";
   public static final String ENROLLMENT_REENROLL = "CONTENT_RE_ENROLLED";
   public static final String ENROLLMENT_UNENROLL = "CONTENT_UN_ENROLLED";
   public static final String SUNBIRD_COURSE_UNENROLL_AND_REENROLL_NOTIFICATIONS_ENABLED = "sunbird_course_unenroll_and_reenroll_notification_enabled";
@@ -1347,7 +1347,8 @@ public final class JsonKey {
   public static final String COMPREHENSIVE_ASSESSMENT_PROGRAM = "Comprehensive Assessment Program";
   public static final String CHILD_NODES = "childNodes";
   public static final String CERTIFICATE_ID  = "certificateId";
-  public static final String ISSUEDCERTIFICATES = "issued_certificates";
-
+  public static final String BHARAT_KALP_EVENT_RESOURCE_TYPE = "bharat_kalp_event_resource_type";
+  public static final String ADDITIONAL_PROPERTIES = "additionalProperties";
+  public static final String IS_BHARAT_KALP_MEMBER = "isBharatKalpMember";
   private JsonKey() {}
 }

@@ -133,6 +133,9 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     if (contentData.isEmpty || !util.Arrays.asList(getConfigValue(JsonKey.COURSE_ENROLL_ALLOWED_PRIMARY_CATEGORY).split(","): _*).contains(contentData.get(JsonKey.PRIMARYCATEGORY).asInstanceOf[String]))
       ProjectCommonException.throwClientErrorException(ResponseCode.accessDeniedToEnrolOrUnenrolCourse, courseId);
 
+    // Volunteers may re-enroll only into courses eligible for their root org
+    validateVolunteerEligibility(userId, courseId, request.getRequestContext)
+
     // Validate batch access
     val batchData: CourseBatch = courseBatchDao.readById(courseId, batchId, request.getRequestContext)
     var enrolmentData: util.List[UserCourses] = userCoursesDao.extendedReadV2(request.getRequestContext, userId, courseId)
@@ -958,6 +961,8 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     if (!isAdminAPI && (contentData.size() == 0 || !util.Arrays.asList(getConfigValue(JsonKey.PROGRAM_ENROLL_ALLOWED_PRIMARY_CATEGORY).split(","): _*).contains(contentData.get(JsonKey.PRIMARYCATEGORY).asInstanceOf[String])))
       ProjectCommonException.throwClientErrorException(ResponseCode.accessDeniedToEnrolOrUnenrolCourse, programId);
     val userId: String = request.get(JsonKey.USER_ID).asInstanceOf[String]
+    // Volunteers may re-enroll only into courses eligible for their root org
+    validateVolunteerEligibility(userId, programId, request.getRequestContext)
     val batchId: String = request.get(JsonKey.BATCH_ID).asInstanceOf[String]
     val batchData: CourseBatch = courseBatchDao.readById(programId, batchId, request.getRequestContext)
     val verifyBatchType: Boolean = Option(request.getContext.get("verifyBatchType").asInstanceOf[Boolean]).getOrElse(false)
@@ -1258,6 +1263,8 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
         }
         val batchUserData: BatchUser = batchUserDao.read(request.getRequestContext, batchId, userId)
         val primaryCategory=contentData.get(JsonKey.PRIMARYCATEGORY).asInstanceOf[String]
+        // Volunteers may re-enroll only into courses eligible for their root org
+        validateVolunteerEligibility(userId, programId, request.getRequestContext)
         if(primaryCategory.equalsIgnoreCase(JsonKey.STANDALONE_ASSESSMENT)) {
           validateEnrolmentV2(batchData, enrolmentData, true,primaryCategory)
         }else{
@@ -1549,6 +1556,8 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     val contentData = getContentReadAPIData(learningPathwayId, fieldList, request)
 
     validateLearningPathwayContent(contentData)
+    // Volunteers may re-enroll only into courses eligible for their root org
+    validateVolunteerEligibility(userId, learningPathwayId, request.getRequestContext)
     val batches = contentData.get(JsonKey.BATCHES).asInstanceOf[java.util.List[java.util.Map[String, AnyRef]]]
 
     val batchId = batches.get(0).get(JsonKey.BATCH_ID).asInstanceOf[String]
@@ -1767,7 +1776,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       sender().tell(successResponse(), self)
       generateTelemetryAudit(userId, courseId, batchId, data, "unenrol", JsonKey.UPDATE, request.getContext)
       notifyUserInAppOnly(userId, batchData, "unenroll", request.getRequestContext)
-      val topic = ProjectUtil.getConfigValue(JsonKey.DEV_USER_UNENROLMENT_EVENT_TOPIC)
+      val topic = ProjectUtil.getConfigValue(JsonKey.USER_UNENROLMENT_EVENT_TOPIC)
       publishKarmaPointsReversalEvent(topic,userId,courseId,batchId,request.getRequestContext)
       cacheUtil.delete(getCacheBatchKey(batchId))
     } else {
@@ -1942,7 +1951,6 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       dataMap.put(JsonKey.E_DATA,requestMap)
       val topic = ProjectUtil.getConfigValue("kafka_user_enrolment_event_topic")
       InstructionEventGenerator.createCourseEnrolmentEvent("", topic, dataMap)
-
     } else {
       ProjectCommonException.throwClientErrorException(
         ResponseCode.accessDeniedToEnrolOrUnenrolCourse,
@@ -2123,8 +2131,8 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     if (isVolunteerUser(roles) && !isCourseEligibleForOrg(rootOrgId, courseId, requestContext)) {
       logger.warn(requestContext, s"Volunteer re-enrollment validation failed for userId=$userId, rootOrgId=$rootOrgId, courseId=$courseId", null)
       ProjectCommonException.throwClientErrorException(
-        ResponseCode.userNotEligibleForReEnrollment,
-        ResponseCode.userNotEligibleForReEnrollment.getErrorMessage
+        ResponseCode.userNotEligibleForEnrollment,
+        ResponseCode.userNotEligibleForEnrollment.getErrorMessage
       )
     }
   }
@@ -2336,6 +2344,15 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
       }
     }
 
+  private def buildContentMap(enrolment: java.util.Map[String, AnyRef],
+                              courseContent: java.util.Map[String, AnyRef]): java.util.HashMap[String, AnyRef] = {
+    val contentMap = new java.util.HashMap[String, AnyRef]()
+    contentMap.put(JsonKey.COURSECATEGORY,
+      if (courseContent != null) courseContent.getOrDefault(JsonKey.COURSECATEGORY, "") else "")
+    contentMap.put(JsonKey.PRIMARYCATEGORY,
+      if (courseContent != null) courseContent.getOrDefault(JsonKey.PRIMARYCATEGORY, "") else "")
+    contentMap.put(JsonKey.STATUS, enrolment.getOrDefault(JsonKey.STATUS, 0.asInstanceOf[AnyRef]))
+    contentMap.put(JsonKey.ACTIVE, enrolment.get(JsonKey.ACTIVE))
     contentMap
   }
 
