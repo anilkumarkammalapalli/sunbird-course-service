@@ -459,10 +459,18 @@ public class ExtendedCourseEnrollmentController extends BaseController {
                 httpRequest.body().asJson(),
                 (req) -> {
                     Request request = (Request) req;
-                    request.getRequest().put(JsonKey.USER_ID, request.getRequest().get(JsonKey.USER_ID));
+                    String userId = (String) request.getContext()
+                            .getOrDefault(JsonKey.REQUESTED_FOR,
+                                    request.getContext().get(JsonKey.REQUESTED_BY));
+                    validator.validateRequestedBy(userId);
+                    request.getContext().put(JsonKey.USER_ID, userId);
+                    request.getRequest().put(JsonKey.USER_ID, userId);
                     return null;
                 },
+                null,
+                null,
                 getAllRequestHeaders(httpRequest),
+                false,
                 httpRequest);
     }
 }
