@@ -2382,16 +2382,6 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
         contentMap.put(JsonKey.CHILD_NODES, childNodes)
       }
     }
-
-  private def buildContentMap(enrolment: java.util.Map[String, AnyRef],
-                              courseContent: java.util.Map[String, AnyRef]): java.util.HashMap[String, AnyRef] = {
-    val contentMap = new java.util.HashMap[String, AnyRef]()
-    contentMap.put(JsonKey.COURSECATEGORY,
-      if (courseContent != null) courseContent.getOrDefault(JsonKey.COURSECATEGORY, "") else "")
-    contentMap.put(JsonKey.PRIMARYCATEGORY,
-      if (courseContent != null) courseContent.getOrDefault(JsonKey.PRIMARYCATEGORY, "") else "")
-    contentMap.put(JsonKey.STATUS, enrolment.getOrDefault(JsonKey.STATUS, 0.asInstanceOf[AnyRef]))
-    contentMap.put(JsonKey.ACTIVE, enrolment.get(JsonKey.ACTIVE))
     contentMap
   }
 
