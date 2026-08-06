@@ -1356,6 +1356,7 @@ public final class JsonKey {
   public static final String LEARNING_HOURS_PROGRAM_COURSE_CATEGORIES = "learning_hours_program_course_categories";
   public static final String CHILD_NODES = "childNodes";
   public static final String CERTIFICATE_ID  = "certificateId";
+  public static final String ISSUEDCERTIFICATES = "issued_certificates";
   public static final String BHARAT_KALP_EVENT_RESOURCE_TYPE = "bharat_kalp_event_resource_type";
   public static final String ADDITIONAL_PROPERTIES = "additionalProperties";
   public static final String IS_BHARAT_KALP_MEMBER = "isBharatKalpMember";
