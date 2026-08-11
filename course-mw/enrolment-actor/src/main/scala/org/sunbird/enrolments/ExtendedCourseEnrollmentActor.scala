@@ -618,10 +618,13 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
           coursesInProgress += 1
         }
       } else {
-        val certificatesIssue = courseDetails.get(JsonKey.ISSUED_CERTIFICATES).asInstanceOf[java.util.ArrayList[util.Map[String, AnyRef]]]
+        var hoursSpentOnCourses: Int = 0
+        val certificatesIssue: java.util.ArrayList[util.Map[String, AnyRef]] = courseDetails.get(JsonKey.ISSUED_CERTIFICATES).asInstanceOf[java.util.ArrayList[util.Map[String, AnyRef]]]
         if (certificatesIssue.nonEmpty) {
-          val courseCategory = courseContent.getOrDefault(JsonKey.COURSECATEGORY, "").asInstanceOf[String]
-          hoursSpentOnCompletedCourses += calculateCategorySpecificDuration(courseCategory, courseContent, courseDetails, actorMessage)
+          if (null != courseContent.get(JsonKey.DURATION)) {
+            hoursSpentOnCourses = courseContent.get(JsonKey.DURATION).asInstanceOf[String].toInt
+          }
+          hoursSpentOnCompletedCourses += hoursSpentOnCourses
           certificateIssued += 1
         }
       }
