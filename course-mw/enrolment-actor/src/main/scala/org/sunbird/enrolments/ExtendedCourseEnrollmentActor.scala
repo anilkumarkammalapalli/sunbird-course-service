@@ -2405,6 +2405,14 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
         }
       }
     }
+    if (JsonKey.COMPREHENSIVE_ASSESSMENT_PROGRAM.equalsIgnoreCase(courseCategory) && courseContent != null) {
+
+      val childNodes = courseContent.get(JsonKey.CHILD_NODES)
+
+      if (childNodes != null) {
+        contentMap.put(JsonKey.CHILD_NODES, childNodes)
+      }
+    }
     contentMap
   }
 
