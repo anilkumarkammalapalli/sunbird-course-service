@@ -129,8 +129,8 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
             requestMap.put(JsonKey.USER_ID,userId)
             requestMap.put(JsonKey.BATCH_ID,batchId)
             dataMap.put("edata",requestMap)
-            val topic = ProjectUtil.getConfigValue("kafka_user_enrolment_event_topic")
-            InstructionEventGenerator.createCourseEnrolmentEvent("", topic, dataMap)
+            val topic = ProjectUtil.getConfigValue(JsonKey.KARMA_POINTS_UNIFIED_EVENT_TOPIC)
+            InstructionEventGenerator.createCourseEnrolmentEvent(userId, topic, dataMap)
             cacheUtil.delete(getCacheBatchKey(batchId))
         } else {
             ProjectCommonException.throwClientErrorException(ResponseCode.accessDeniedToEnrolOrUnenrolCourse, courseId)
@@ -202,8 +202,8 @@ class CourseEnrolmentActor @Inject()(@Named("course-batch-notification-actor") c
             requestMap.put(JsonKey.USER_ID,userId)
             requestMap.put(JsonKey.BATCH_ID,batchId)
             dataMap.put("edata",requestMap)
-            val topic = ProjectUtil.getConfigValue("kafka_user_enrolment_event_topic")
-            InstructionEventGenerator.createCourseEnrolmentEvent("", topic, dataMap)
+            val topic = ProjectUtil.getConfigValue(JsonKey.KARMA_POINTS_UNIFIED_EVENT_TOPIC)
+            InstructionEventGenerator.createCourseEnrolmentEvent(userId, topic, dataMap)
             cacheUtil.delete(getCacheBatchKey(batchId))
         } else {
             ProjectCommonException.throwClientErrorException(ResponseCode.accessDeniedToEnrolOrUnenrolCourse, courseId)
