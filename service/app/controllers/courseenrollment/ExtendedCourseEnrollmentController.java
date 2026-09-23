@@ -171,6 +171,55 @@ public class ExtendedCourseEnrollmentController extends BaseController {
                 httpRequest);
     }
 
+    public CompletionStage<Result> validateMandatoryCourseCompletion(String doId, Http.Request httpRequest) {
+        return handleRequest(extendedCourseEnrolmentActor, "validateMandatoryCourseCompletion",
+                httpRequest.body().asJson(),
+                (req) -> {
+                    Request request = (Request) req;
+                    String userId = (String) request.getContext().getOrDefault(JsonKey.REQUESTED_FOR, request.getContext().get(JsonKey.REQUESTED_BY));
+                    validator.validateRequestedBy(userId);
+                    request.getContext().put(JsonKey.USER_ID, userId);
+                    request.getRequest().put(JsonKey.USER_ID, userId);
+                    request.getRequest().put(JsonKey.COURSE_ID, doId);
+                    return null;
+                },
+                null,
+                null,
+                getAllRequestHeaders((httpRequest)),
+                false,
+                httpRequest);
+    }
+
+    // Single-hop Comprehensive Assessment auto-enrollment: validates CbPlan eligibility and
+    // mandatory-course completion, then enrolls into an auto-resolved batch, in one call.
+    // userId is strictly derived from the caller's own token (RequestInterceptor.verifyRequestData) -
+    // never taken from caller input, matching the convention used by getEnrolledCoursesV4/ListV4.
+    public CompletionStage<Result> autoEnrollComprehensiveAssessment(String doId, Http.Request httpRequest) {
+        String tokenUserId = RequestInterceptor.verifyRequestData(httpRequest);
+        if (JsonKey.UNAUTHORIZED.equalsIgnoreCase(tokenUserId)
+                || JsonKey.ANONYMOUS.equalsIgnoreCase(tokenUserId)) {
+            throw new ProjectCommonException(
+                    ResponseCode.unAuthorized.getErrorCode(),
+                    ResponseCode.unAuthorized.getErrorMessage(),
+                    ResponseCode.UNAUTHORIZED.getResponseCode());
+        }
+        return handleRequest(extendedCourseEnrolmentActor, "autoEnrollComprehensiveAssessment",
+                httpRequest.body().asJson(),
+                (req) -> {
+                    Request request = (Request) req;
+                    request.getContext().put(JsonKey.USER_ID, tokenUserId);
+                    request.getRequest().put(JsonKey.USER_ID, tokenUserId);
+                    request.getRequest().put(JsonKey.COURSE_ID, doId);
+                    request.getRequest().put(JsonKey.RECENT_LANGUAGE, httpRequest.getQueryString(JsonKey.LANGUAGE));
+                    return null;
+                },
+                null,
+                null,
+                getAllRequestHeaders((httpRequest)),
+                false,
+                httpRequest);
+    }
+
     public CompletionStage<Result> enrolmentUserInfoStats(String uid, Http.Request httpRequest) {
         return handleRequest(extendedCourseEnrolmentActor, "enrolmentInfoStats",
                 httpRequest.body().asJson(),

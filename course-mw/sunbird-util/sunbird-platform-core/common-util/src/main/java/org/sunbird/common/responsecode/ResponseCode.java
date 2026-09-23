@@ -885,6 +885,15 @@ public enum ResponseCode {
   userNotEligibleForEnrollment(
       ResponseMessage.Key.USER_NOT_ELIGIBLE_FOR_ENROLLMENT,
       ResponseMessage.Message.USER_NOT_ELIGIBLE_FOR_ENROLLMENT),
+  mandatoryCoursesAccessRestricted(
+      ResponseMessage.Key.MANDATORY_COURSES_ACCESS_RESTRICTED,
+      ResponseMessage.Message.MANDATORY_COURSES_ACCESS_RESTRICTED),
+  mandatoryCoursesNotCompleted(
+      ResponseMessage.Key.MANDATORY_COURSES_NOT_COMPLETED,
+      ResponseMessage.Message.MANDATORY_COURSES_NOT_COMPLETED),
+  notEligibleForAssessment(
+      ResponseMessage.Key.NOT_ELIGIBLE_FOR_ASSESSMENT,
+      ResponseMessage.Message.NOT_ELIGIBLE_FOR_ASSESSMENT),
   invalidCompletionPercentage(
           ResponseMessage.Key.INVALID_COMPLETION_PERCENTAGE_ERROR,
           ResponseMessage.Message.INVALID_COMPLETION_PERCENTAGE_ERROR),
