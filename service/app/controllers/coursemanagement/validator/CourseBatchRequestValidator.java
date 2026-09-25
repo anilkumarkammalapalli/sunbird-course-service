@@ -242,6 +242,16 @@ public class CourseBatchRequestValidator extends BaseRequestValidator {
           JsonKey.MENTORS,
           "Arrays");
     }
+
+    if (request.getRequest().containsKey(JsonKey.COTRAINERS)
+        && !(request.getRequest().get(JsonKey.COTRAINERS) instanceof List)) {
+      throw new ProjectCommonException(
+          ResponseCode.dataTypeError.getErrorCode(),
+          ResponseCode.dataTypeError.getErrorMessage(),
+          ERROR_CODE,
+          JsonKey.COTRAINERS,
+          "Arrays");
+    }
   }
 
   private void validateUpdateBatchStartDate(String startDate) {
