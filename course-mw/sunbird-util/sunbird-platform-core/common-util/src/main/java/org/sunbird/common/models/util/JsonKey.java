@@ -136,6 +136,7 @@ public final class JsonKey {
   public static final String CONTENTS = "contents";
   public static final String CONTEXT = "context";
   public static final String CORRELATED_OBJECTS = "correlatedObjects";
+  public static final String COTRAINERS = "coTrainers";
   public static final String COUNT = "count";
   public static final String COUNT_DECREMENT_DATE = "countDecrementDate";
   public static final String COUNT_INCREMENT_DATE = "countIncrementDate";
