@@ -172,7 +172,9 @@ public class CourseBatchManagementActor extends BaseActor {
 
   //  updateBatchCount(courseBatch);
       String courseName = StringUtils.defaultIfBlank((String) contentDetails.get(JsonKey.NAME), "");
-      updateCollection(actorMessage.getRequestContext(), esCourseMap, contentDetails);
+      if (!JsonKey.PRIMARY_CATEGORY_BLENDED_PROGRAM.equalsIgnoreCase(primaryCategory)) {
+        updateCollection(actorMessage.getRequestContext(), esCourseMap, contentDetails);
+      }
 
       if (JsonKey.PRIMARY_CATEGORY_BLENDED_PROGRAM.equalsIgnoreCase(primaryCategory)) {
       CourseBatchUtil.calculateBlendedProgramDuration(contentDetails, courseBatch.getCourseId(), courseBatchId, actorMessage.getRequestContext());
@@ -266,7 +268,9 @@ public class CourseBatchManagementActor extends BaseActor {
     rollUp.put("l1", courseBatch.getCourseId());
     TelemetryUtil.addTargetObjectRollUp(rollUp, targetObject);
     TelemetryUtil.telemetryProcessingCall(courseBatchMap, targetObject, correlatedObject, actorMessage.getContext());
-    updateCollection(actorMessage.getRequestContext(), esCourseMap, contentDetails);
+    if (!JsonKey.PRIMARY_CATEGORY_BLENDED_PROGRAM.equalsIgnoreCase(primaryCategory)) {
+      updateCollection(actorMessage.getRequestContext(), esCourseMap, contentDetails);
+    }
 
     if (JsonKey.PRIMARY_CATEGORY_BLENDED_PROGRAM.equalsIgnoreCase(primaryCategory)) {
       CourseBatchUtil.syncBlendedProgramDurationCache(contentDetails, courseBatch.getCourseId(), batchId, actorMessage.getRequestContext());
@@ -325,6 +329,9 @@ public class CourseBatchManagementActor extends BaseActor {
 
     if (request.containsKey(JsonKey.MENTORS))
       courseBatch.setMentors((List<String>) request.get(JsonKey.MENTORS));
+
+    if (request.containsKey(JsonKey.COTRAINERS))
+      courseBatch.setCoTrainers((List<String>) request.get(JsonKey.COTRAINERS));
 
       Object batchAttrObj = request.get(CourseJsonKey.BATCH_ATTRIBUTES);
       if (batchAttrObj instanceof Map && MapUtils.isNotEmpty((Map<?, ?>) batchAttrObj)) {
