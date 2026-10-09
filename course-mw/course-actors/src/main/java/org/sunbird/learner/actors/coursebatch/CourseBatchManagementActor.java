@@ -268,7 +268,9 @@ public class CourseBatchManagementActor extends BaseActor {
     rollUp.put("l1", courseBatch.getCourseId());
     TelemetryUtil.addTargetObjectRollUp(rollUp, targetObject);
     TelemetryUtil.telemetryProcessingCall(courseBatchMap, targetObject, correlatedObject, actorMessage.getContext());
-    updateCollection(actorMessage.getRequestContext(), esCourseMap, contentDetails);
+    if (!JsonKey.PRIMARY_CATEGORY_BLENDED_PROGRAM.equalsIgnoreCase(primaryCategory)) {
+      updateCollection(actorMessage.getRequestContext(), esCourseMap, contentDetails);
+    }
 
     if (JsonKey.PRIMARY_CATEGORY_BLENDED_PROGRAM.equalsIgnoreCase(primaryCategory)) {
       CourseBatchUtil.syncBlendedProgramDurationCache(contentDetails, courseBatch.getCourseId(), batchId, actorMessage.getRequestContext());
