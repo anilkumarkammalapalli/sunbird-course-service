@@ -2518,6 +2518,7 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
                   primaryKey,
                   java.util.Arrays.asList(
                     JsonKey.COURSE_ID,
+                    JsonKey.BATCH_ID,
                     JsonKey.STATUS,
                     JsonKey.ACTIVE,
                     JsonKey.ISSUEDCERTIFICATES
@@ -2598,6 +2599,8 @@ class ExtendedCourseEnrollmentActor @Inject()(@Named("course-batch-notification-
     )
 
     contentMap.put(JsonKey.ACTIVE, enrolment.get(JsonKey.ACTIVE))
+
+    contentMap.put(JsonKey.BATCH_ID, enrolment.get(JsonKey.BATCH_ID))
 
     val status = Option(enrolment.get(JsonKey.STATUS))
       .map(_.toString.toInt)
