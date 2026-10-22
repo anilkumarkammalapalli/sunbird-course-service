@@ -7,12 +7,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import net.logstash.logback.encoder.org.apache.commons.lang3.StringUtils;
 
 import java.util.*;
+import java.util.stream.Collectors;
 import org.apache.commons.collections.CollectionUtils;
 import org.sunbird.cassandra.CassandraOperation;
 import org.sunbird.common.Constants;
+import org.sunbird.common.exception.ProjectCommonException;
 import org.sunbird.common.models.response.Response;
 import org.sunbird.common.models.util.JsonKey;
 import org.sunbird.common.request.RequestContext;
+import org.sunbird.common.responsecode.ResponseCode;
 import org.sunbird.helper.ServiceFactory;
 import org.sunbird.learner.actors.coursebatch.dao.UserCoursesDao;
 import org.sunbird.learner.util.ExtendedUtil;
@@ -628,8 +631,11 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
   }
 
 
-  public Map<String, Object> getBatchParticipantsByPageV2(RequestContext requestContext, Map<String, Object> request) {
-    logger.info(requestContext, "UserCourseDao:: getBatchParticipantsByPage:: Received request:: " + request);
+  public Map<String, Object> getProgramBatchParticipantsByPage(RequestContext requestContext, Map<String, Object> request) {
+    logger.info(requestContext, "UserCourseDao:: getProgramBatchParticipantsByPage:: Received request:: " + request);
+    final int MAX_PAGINATION_RECORDS = 10000;
+    final int MAX_LIMIT = 100;
+    final int MAX_FETCH_SIZE = 1000;
     Map<String, Object> queryMap = new HashMap<>();
     queryMap.put(JsonKey.BATCH_ID, (String) request.get(JsonKey.BATCH_ID));
     Map<String, Object> result = new HashMap<>();
@@ -639,13 +645,30 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
     if (limit == null || limit <= 0) {
       limit = Constants.DEFAULT_LIMIT;
     }
+    if (limit > MAX_LIMIT) {
+      throw new ProjectCommonException(
+              ResponseCode.invalidRequestData.getErrorCode(),
+              "limit cannot be greater than " + MAX_LIMIT,
+              ResponseCode.CLIENT_ERROR.getResponseCode());
+    }
     Integer currentOffset = (Integer) request.get(JsonKey.CURRENT_OFFSET);
     if (currentOffset == null || currentOffset < 0) {
       currentOffset = 0;
     }
 
-    String pageId = (String) request.get(JsonKey.PAGE_ID);
+    if (currentOffset >= MAX_PAGINATION_RECORDS) {
+      throw new ProjectCommonException(
+              ResponseCode.invalidRequestData.getErrorCode(),
+              "Pagination is supported only for the first " + MAX_PAGINATION_RECORDS + " records",
+              ResponseCode.CLIENT_ERROR.getResponseCode());
+    }
+    if (currentOffset + limit > MAX_PAGINATION_RECORDS) {
+      limit = MAX_PAGINATION_RECORDS - currentOffset;
+    }
+
     long userCount = 0L;
+    long activeTrueCount = 0L;
+    long activeFalseCount = 0L;
     Response res = cassandraOperation.getRecordsByPropertiesWithoutFiltering(
             requestContext,
             KEYSPACE_NAME,
@@ -660,32 +683,36 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
 
     if (CollectionUtils.isNotEmpty(batchUsers)) {
       userCount = batchUsers.size();
-    }
+      Map<Boolean, Long> userCountMap = batchUsers.stream()
+              .filter(user -> user.get(JsonKey.ACTIVE) != null)
+              .collect(Collectors.groupingBy(
+                      user -> Boolean.TRUE.equals(user.get(JsonKey.ACTIVE)),
+                      Collectors.counting()
+              ));
 
+      activeTrueCount = userCountMap.getOrDefault(true, 0L);
+      activeFalseCount = userCountMap.getOrDefault(false, 0L);
+    }
     logger.info(requestContext, "Total enrolment in the batch : " + request.get(JsonKey.BATCH_ID) + " is: " + userCount);
     int offset = currentOffset;
-    String currentPageId = pageId;
-    String nextPageId = null;
+    String currentPageId = null;
     boolean dataAvailable = true;
     while (dataAvailable && userList.size() < limit) {
       String pageStartId = currentPageId;
 
+      int fetchSize = Math.min(limit - userList.size() + offset, MAX_FETCH_SIZE);
       Response response = cassandraOperation.getRecordByIdentifierWithPage(requestContext,
-              KEYSPACE_NAME, ENROLMENT_BATCH_LOOKUP, queryMap, null, currentPageId, limit);
+              KEYSPACE_NAME, ENROLMENT_BATCH_LOOKUP, queryMap, null, currentPageId, fetchSize);
 
       List<Map<String, Object>> userCoursesList = (List<Map<String, Object>>) response.get(JsonKey.RESPONSE);
-      nextPageId = (String) response.get(JsonKey.PAGE_ID);
+      String nextPageId = (String) response.get(JsonKey.PAGE_ID);
 
       if (CollectionUtils.isEmpty(userCoursesList)) {
-        dataAvailable = false;
-        nextPageId = null;
         break;
       }
-      int recordsConsumedFromCurrentPage = 0;
       for (Map<String, Object> userCourse : userCoursesList) {
         if (offset > 0) {
           offset--;
-          recordsConsumedFromCurrentPage++;
           continue;
         }
 
@@ -694,19 +721,7 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
         userInfo.put(JsonKey.ACTIVE, userCourse.get(JsonKey.ACTIVE));
         userList.add(userInfo);
 
-        recordsConsumedFromCurrentPage++;
-
         if (userList.size() == limit) {
-
-          if (recordsConsumedFromCurrentPage < userCoursesList.size()) {
-
-            nextPageId = pageStartId;
-            offset = recordsConsumedFromCurrentPage;
-
-          } else {
-            nextPageId = nextPageId;
-            offset = 0;
-          }
           break;
         }
       }
@@ -716,21 +731,15 @@ public class UserCoursesDaoImpl implements UserCoursesDao {
                 && !nextPageId.equals(pageStartId)) {
 
           currentPageId = nextPageId;
-          offset = 0;
 
         } else {
           dataAvailable = false;
         }
-      } else {
-        break;
       }
     }
-    if (StringUtils.isNotBlank(nextPageId)) {
-      result.put(JsonKey.PAGE_ID, nextPageId);
-    } else {
-      result.put(JsonKey.PAGE_ID, null);
-    }
-    result.put(JsonKey.COUNT, userCount);
+    result.put("totalCount", userCount);
+    result.put("activeCount", activeTrueCount);
+    result.put("inactiveCount", activeFalseCount);
     result.put(JsonKey.CURRENT_OFFSET, currentOffset);
     result.put(JsonKey.PARTICIPANTS, userList);
     return result;
